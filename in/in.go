@@ -1,48 +1,47 @@
 package main
 
-import ("encoding/xml")
-import ("fmt")
-import ("os")
-import ("io/ioutil")
+import (
+  "io/ioutil"
+  "encoding/xml"
+  "html/template"
+  "net/http"
+  "fmt"
+)
 
+type RSSEnclosure struct {
+  XMLName xml.Name `xml:"rss"`
+  Version string `xml:"version,attr"`
 
-type RSSEnclousure struct {
+  Title string `xml:"channel>title"`
+  Link string `xml:"channel>link"`
+  Description string  `xml:"channel>description"`
 
-}
-
-type Blog struct {
-  Post Item
-  PostList []Item `xml:"item>"`
+  PubDate string `xml:"channel>pubDate"`
+  ItemList []Item `xml:"channel>item"`
 }
 
 type Item struct {
-  Title string `xml:"title>"`
-  Link string
-  Category map[string] bool
-  Description string
-  Content string
+
+  Title string `xml:"title"`
+  Link string `xml:"link"`
+  Description template.HTML `xml:"description"`
+
+  Content template.HTML`xml:"encoded"`
+  PubDate string `xml:"pubDate"`
+  Comments string `xml:"comments"`
 }
 
-
-
-func (post Item) String() string {
-  return fmt.Sprintf("%s - %d", post.Title, post.Category)
-}
 
 func main() {
-  xmlFile, err := os.Open("rss.xml")
-  if err != nil {
-    fmt.Println("Error opening file: ", err)
-    return
-  }
-  defer xmlFile.Close()
-
-  var blog Blog
-  b, _ := ioutil.ReadAll(xmlFile)
-    xml.Unmarshal(b, &blog)
-
-  fmt.Println(blog.Post)
-  for _, post := range blog.PostList {
-    fmt.Printf("==>", post)
+  r := RSSEnclosure{}
+  httpData, httpError := http.Get("https://starkandwayne.com/blog/rss/")
+  if httpError != nil { panic(httpError.Error()) }
+  defer httpData.Body.Close()
+  xmlContent, readError := ioutil.ReadAll(httpData.Body)
+  if readError != nil { panic(readError.Error()) }
+  xmlError := xml.Unmarshal(xmlContent, &r)
+  if xmlError != nil { panic(xmlError.Error()) }
+  for _, item := range r.ItemList {
+  fmt.Println(item.Title)
   }
 }
