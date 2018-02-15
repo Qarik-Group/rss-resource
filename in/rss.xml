@@ -1,0 +1,1400 @@
+<?xml version="1.0" encoding="UTF-8"?><rss xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:content="http://purl.org/rss/1.0/modules/content/" xmlns:atom="http://www.w3.org/2005/Atom" version="2.0" xmlns:media="http://search.yahoo.com/mrss/"><channel><title><![CDATA[Stark & Wayne Blog]]></title><description><![CDATA[Our thoughts about software development, delivery and automation.]]></description><link>http://www.starkandwayne.com/blog/</link><generator>Ghost 0.11</generator><lastBuildDate>Thu, 15 Feb 2018 17:18:38 GMT</lastBuildDate><atom:link href="http://www.starkandwayne.com/blog/rss/" rel="self" type="application/rss+xml"/><ttl>60</ttl><item><title><![CDATA[BOSH releases with Git LFS]]></title><description><![CDATA[<p>Using an <a href="https://bosh.io/docs/release-blobstore.html#s3-config">external blobstore</a> for your BOSH release is considered a best practice, since you don't want to pollute your git repo with big files. However there are some downsides to this approach:</p>
+
+<ul>
+<li>Need a AWS or GCP account; or need an internal compatible blobstore</li>
+<li>Sharing manage credentials to upload</li></ul>]]></description><link>http://www.starkandwayne.com/blog/bosh-releases-with-git-lfs/</link><guid isPermaLink="false">1bd445d9-113d-4b6f-a968-bc5a0c50c693</guid><category><![CDATA[bosh]]></category><category><![CDATA[github]]></category><category><![CDATA[author-rkoster]]></category><dc:creator><![CDATA[Ruben Koster]]></dc:creator><pubDate>Wed, 14 Feb 2018 12:40:35 GMT</pubDate><content:encoded><![CDATA[<p>Using an <a href="https://bosh.io/docs/release-blobstore.html#s3-config">external blobstore</a> for your BOSH release is considered a best practice, since you don't want to pollute your git repo with big files. However there are some downsides to this approach:</p>
+
+<ul>
+<li>Need a AWS or GCP account; or need an internal compatible blobstore</li>
+<li>Sharing manage credentials to upload blobs (private.yml)</li>
+<li>Restricted environments sometimes don't allow access to Internet</li>
+<li>Pull Requests to update blobs might not be possible for people without accsss to secret credentials</li>
+</ul>
+
+<p>Luckily there is an other option, <a href="https://git-lfs.github.com/">Git Large File Storage</a> (LFS). It works with <a href="https://help.github.com/articles/github-s-billing-plans/#git-large-file-storage">GitHub</a> and <a href="https://docs.gitlab.com/ee/workflow/lfs/manage_large_binaries_with_git_lfs.html">GitLab</a>. Using it with your newly created boshrelease is really easy. We switch to the <code>local</code> blobstore provider:</p>
+
+<pre><code>DIR=foo-boshrelease  
+bosh init-release --git --dir=${DIR}
+
+cat &lt;&lt;EOT &gt;&gt; ${DIR}/config/final.yml  
+blobstore:  
+  provider: local
+  options:
+    blobstore_path: final_blobs
+EOT
+
+cat &lt;&lt;EOT &gt; ${DIR}/.gitattributes  
+blobs/** filter=lfs diff=lfs merge=lfs -text  
+final_blobs/** filter=lfs diff=lfs merge=lfs -text  
+EOT  
+</code></pre>
+
+<p>After this files created by <code>bosh add-blobs</code> and <code>bosh create-release --final</code> can be committed to your repo with <code>git commit</code> and will be stored with git lfs. No more need for <code>bosh sync-blobs</code>, instead just <code>git commit &amp;&amp; git push</code>. </p>]]></content:encoded></item><item><title><![CDATA[Use Latest Major Stemcell Version]]></title><description><![CDATA[<p>Hey. Sometimes new major stemcells come out and they use newer versions of Linux and they break <em>your stuff</em>. Sometimes it's your fault that your thing doesn't work. Sometimes we blame Elon Musk because we have trouble taking responsibility for our mistakes. We're sorry, Elon.</p>
+
+<p>The point is, you don't</p>]]></description><link>http://www.starkandwayne.com/blog/use-latest-major-stemcell-version/</link><guid isPermaLink="false">7d6cc918-145e-43a6-b84f-1f1f713030ed</guid><category><![CDATA[bosh]]></category><category><![CDATA[bosh2]]></category><category><![CDATA[author-tom]]></category><dc:creator><![CDATA[Thomas Mitchell]]></dc:creator><pubDate>Tue, 13 Feb 2018 16:26:39 GMT</pubDate><content:encoded><![CDATA[<p>Hey. Sometimes new major stemcells come out and they use newer versions of Linux and they break <em>your stuff</em>. Sometimes it's your fault that your thing doesn't work. Sometimes we blame Elon Musk because we have trouble taking responsibility for our mistakes. We're sorry, Elon.</p>
+
+<p>The point is, you don't want to use the latest stemcell. You just want to use the latest stemcell from within a major version.</p>
+
+<p>Code block.</p>
+
+<pre><code>stemcells:  
+- alias: default
+  os: ubuntu-trusty
+  version: "3468.latest"
+</code></pre>
+
+<p>Boom. Feast your eyes on that delicious morsel. This is the future of remaining in the past. Enjoy.</p>]]></content:encoded></item><item><title><![CDATA[Using Concourse CI to test your web app and PostgreSQL]]></title><description><![CDATA[We look at how to setup and run PostgreSQL within Concourse CI prior to running our application's test suite]]></description><link>http://www.starkandwayne.com/blog/testing-your-ruby-on-rails-app-with-concourse-ci/</link><guid isPermaLink="false">31371ce1-4c87-40c0-a0f2-7ebf1c34d00d</guid><category><![CDATA[concourseci]]></category><category><![CDATA[rubyonrails]]></category><category><![CDATA[postgresql]]></category><dc:creator><![CDATA[Dr Nic Williams]]></dc:creator><pubDate>Thu, 01 Feb 2018 23:47:25 GMT</pubDate><content:encoded><![CDATA[<p>A typical web application will need services, such as databases and caches, to run. It will probably also need these services to run its test suite. In this blog post, we will look at how to set up and run PostgreSQL within Concourse CI prior to running our application's test suite.</p>
+
+<h3 id="theproblem">The Problem</h3>
+
+<p>For a Ruby on Rails web app example, ideally you'd like a <code>ci/scripts/tests.sh</code> wrapper script that was simply:</p>
+
+<pre><code class="language-yaml">#!/bin/bash
+
+# install ruby dependencies, create databases, update schema, and run tests
+bundle install  
+bundle exec rails test  
+</code></pre>
+
+<p>Unfortunately we have not configured the application about its service dependencies (e.g. PostgreSQL). Nor does the container running this wrapper script actually contain a running PostgreSQL service. <strong>And that right there is the problem we will solve in this blog post.</strong></p>
+
+<h3 id="thesolution">The Solution</h3>
+
+<p>The following script fixes both issues - it will install &amp; configure PostgreSQL, and it will configure the web app to use the local PostgreSQL service.</p>
+
+<pre><code class="language-yaml">#!/bin/bash
+
+# assumes this script is in ci/scripts/ folder
+# so change to root directory of app
+DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &amp;&amp; pwd )"  
+cd $DIR/../..
+
+# fail fast if any command errors
+set -e
+
+# install the postgresql service + client libraries
+apt-get update  
+apt-get install -y postgresql libpq-dev
+
+# allow access from any local client as `postgres` user
+cat &gt; /etc/postgresql/*/main/pg_hba.conf &lt;&lt;-EOF  
+local   all   postgres   trust  
+EOF
+
+# start the postgres service
+service postgresql restart
+
+#
+# This point onwards is specific to Ruby on Rails
+#
+
+# configure the application to use the local DB
+cat &gt; config/database.yml &lt;&lt;-YAML  
+default: &amp;default  
+  adapter: postgresql
+  encoding: unicode
+  pool: 5
+  username: postgres
+  template: template0
+
+development:  
+  &lt;&lt;: *default
+  database: collective-training-app_development
+
+test:  
+  &lt;&lt;: *default
+  database: collective-training-app_test
+
+production:  
+  &lt;&lt;: *default
+  database: collective-training-app_production
+YAML
+
+# install ruby dependencies, create databases, update schema, and run tests
+bundle install  
+bundle exec rails db:create:all  
+bundle exec rails db:migrate  
+bundle exec rails test  
+</code></pre>
+
+<h3 id="thespeedup">The Speed Up</h3>
+
+<p>This script takes about two minutes to run for an application with a small <code>rails test</code> suite. The breakdown of time:</p>
+
+<ul>
+<li>installing and configuring PostgreSQL - <strong>13 seconds</strong></li>
+<li>downloading and installing Ruby gems (<code>bundle install</code>) - <strong>85 seconds</strong></li>
+<li>running PostgreSQL, creating databases and schemas - 8 seconds</li>
+<li>running tests - 7 seconds</li>
+</ul>
+
+<p>Since the version of PostgreSQL and most of the web application dependencies (RubyGems in the example above) are relatively static, you could gain a huge percentage speed improvement by pre-installing PostgresSQL and the RubyGems into the Docker image you are using.</p>
+
+<p>In my pipeline, the test task dropped to 23 seconds instead of approximately 120 seconds.</p>
+
+<p>Fortunately Concourse CI is also very good at creating and updating Docker images for use by other Concourse CI tasks. See our Concourse Tutorial lesson on <a href="https://concoursetutorial.com/miscellaneous/docker-images/">Creating and Using Docker Images</a>.</p>
+
+<p><img src="https://s3.amazonaws.com/dingo-s3-544e680a-902c-44c1-ab35-94b372e1b39e/2018/02/2010-03-20-nbajam.jpg" alt="Boomshakalaka"></p>]]></content:encoded></item><item><title><![CDATA[ProTip: Find BOSH Docs Fast]]></title><description><![CDATA[Great headers at bosh.io/docs can guide you, this post shows the most amazing way to find BOSH docs faster than ever.  Bring your stopwatch.  I'll time you.]]></description><link>http://www.starkandwayne.com/blog/find-bosh-docs-faster-than-ever-before/</link><guid isPermaLink="false">15c1920b-598e-41a9-b5f0-4e8a7926cd9b</guid><category><![CDATA[BOSH]]></category><category><![CDATA[author-tbird]]></category><category><![CDATA[Documentation]]></category><dc:creator><![CDATA[Tyler Bird]]></dc:creator><pubDate>Wed, 24 Jan 2018 16:10:59 GMT</pubDate><media:content url="https://s3.amazonaws.com/dingo-s3-544e680a-902c-44c1-ab35-94b372e1b39e/2018/01/find-cf-bosh.png" medium="image"/><content:encoded><![CDATA[<img src="https://s3.amazonaws.com/dingo-s3-544e680a-902c-44c1-ab35-94b372e1b39e/2018/01/find-cf-bosh.png" alt="ProTip: Find BOSH Docs Fast"><p>When you first hit the <a href="http://bosh.io/docs">documentation page</a> for BOSH, did you get the "wall of text" feeling of information overload?  Some days I want to crack open the site, sit next to a roaring fireplace, and just read for days.  The rest of the time I need the information, and I need it now.</p>
+
+<p>First off, the way the page is organized and structured into headings is great.  As you build and own your BOSH system, use the headers to guide you to the correct reference material when you need it most.  Stuff like how to <a href="https://bosh.io/docs#install">Install BOSH</a>, <a href="https://bosh.io/docs#basic-deploy">deploy BOSH software</a> or <a href="https://bosh.io/docs#cli-v2">references to the CLI</a>.  And so much more...</p>
+
+<p>Yet sometimes, if you just need to find that needle in the haystack, here's a useful Google search syntax hack:</p>
+
+<pre><code>cloud-config site:bosh.io  
+</code></pre>
+
+<p>Put in your search term, and add <code>site:bosh.io</code> to the end, and suddenly you're related to Uncle Bob.  Or Bob's your uncle... I forget how he becomes related to you, but you get the idea.</p>
+
+<p>Maybe you get adopted by a woman who... stay with me... has a brother named Robert?</p>
+
+<p>Anyway... feel free to share and enjoy until they add search directly to the site.</p>]]></content:encoded></item><item><title><![CDATA[SHIELD v8 using UAA]]></title><description><![CDATA[<h1 id="overview">Overview</h1>
+
+<p>The upcoming release of SHIELD v8 adds support for GitHub and UAA authentication providers. Previous versions of SHIELD only supported basic auth. Many organizations already heavily rely on GitHub and UAA to organize users and permissions within an organization. You will be able to leverage these existing authentication providers</p>]]></description><link>http://www.starkandwayne.com/blog/shield-v8-using-uaa/</link><guid isPermaLink="false">a5e1b8dd-416f-48da-bc28-05489e4f8467</guid><category><![CDATA[author-cweibel]]></category><category><![CDATA[SHIELD]]></category><dc:creator><![CDATA[Chris Weibel]]></dc:creator><pubDate>Thu, 14 Dec 2017 19:52:36 GMT</pubDate><content:encoded><![CDATA[<h1 id="overview">Overview</h1>
+
+<p>The upcoming release of SHIELD v8 adds support for GitHub and UAA authentication providers. Previous versions of SHIELD only supported basic auth. Many organizations already heavily rely on GitHub and UAA to organize users and permissions within an organization. You will be able to leverage these existing authentication providers to grant access to SHIELD.</p>
+
+<p><a href="https://github.com/starkandwayne/shield/blob/v8/docs/tenancy.md">Multi-tenancy</a> is also being added. A tenant is a single group that defines the context for interaction with resources in a SHIELD configuration. All retention policies, jobs, backup targets, storage endpoints, and archives belong to a single tenant. Each tenant creates and manages its own target and storage configurations, and tenants are prevented from accessing or viewing another tenant's configuration.</p>
+
+<p>The rest of this blog explores leveraging groups defined in UAA and mapping these groups to tenants in SHIELD. There are many different ways to mapping <a href="https://github.com/starkandwayne/shield/blob/v8/docs/auth/uaa.md#mappings">tenant roles</a> to UAA groups, you are encouraged to understand these roles and map them to your organization as you see fit.</p>
+
+<h1 id="usecase">Use Case</h1>
+
+<p>Assume we work at a company where UAA is used to control access to BOSH with the following groups of people:  </p>
+
+<ul>
+<li>Admins are defined in the BOSH deployment manifest's UAA properties to control the cloud-config and platform level maintenance such as deploying BOSH, Cloud Foundry &amp; SHIELD. </li>
+<li>There are also <a href="https://bosh.io/docs/director-users-uaa-perms.html#team-admin">BOSH Teams</a> defined where members of each of these teams can deploy without having access to the platform deployments or deployments from other BOSH teams. </li>
+<li>There are three BOSH Teams defined with this sandboxed access: Postgres Team, RabbitMQ Team, and Vault Team. </li>
+</ul>
+
+<p>Our goal is for each of these teams to control their own BOSH deployments and also control their own backups and restores with SHIELD without impacting each other. The overall use case looks like:</p>
+
+<p><img src="https://raw.githubusercontent.com/cweibel/ghost_blog_pics/master/shield.v8.uaa.png" alt="use cases"></p>
+
+<h1 id="implementation">Implementation</h1>
+
+<p>Configuring SHIELD to use UAA is done in two steps:</p>
+
+<ol>
+<li>Configure UAA groups and membership in BOSH  </li>
+<li>Configure the UAA group mappings to SHIELD tenants and roles </li>
+</ol>
+
+<h2 id="step1configuringbosh">Step 1 - Configuring BOSH</h2>
+
+<p>We've identified a number of groups in our organization which have different access requirements to both BOSH and SHIELD. Below we break down how to turn pieces of the use case into configuration points in the BOSH deployment manifest.</p>
+
+<h3 id="defineboshteamsuaagroups">Define BOSH Teams / UAA Groups</h3>
+
+<p>In the manifest for BOSH we can define the three teams, one each for the Postgres Team, RabbitMQ Team, and Vault Team:</p>
+
+<pre><code>properties:  
+  uaa:
+    scim:
+      groups:
+        bosh.teams.postgres.admin: Postgres Admin Group
+        bosh.teams.rabbitmq.admin: RabbitMQ Admin Group
+        bosh.teams.vault.admin:    Vault Admin Group
+</code></pre>
+
+<p>So that each team can also upload their own stemcells and releases, we also add the groups <code>bosh.read</code>, <code>bosh.releases.upload</code>, and <code>bosh.stemcell.upload</code> as described in the <a href="https://bosh.io/docs/director-users-uaa-perms.html#team-admin">BOSH Teams documentation</a>:</p>
+
+<pre><code>properties:  
+  uaa:
+    scim:
+      groups:
+        bosh.read: BOSH Read Only Access
+        bosh.releases.upload: BOSH Releases Upload Group
+        bosh.stemcells.upload: BOSH Stemcell Upload Group
+</code></pre>
+
+<p>We'll also add three SHIELD specific UAA groups to make mapping a bit easier to each of the SYSTEM tenant roles understood by SHIELD (admin, manager, engineer):</p>
+
+<pre><code>properties:  
+  uaa:
+    scim:
+      groups:
+        shield.admin: SHIELD System Admin Group
+        shield.manager: SHIELD System Manager Group
+        shield.engineer: SHIELD System Engineering Group
+</code></pre>
+
+<h3 id="defineuaausers">Define UAA Users</h3>
+
+<p>Now that all the UAA groups have been defined for our use case, the UAA users can be added. UAA users are defined with the usernames and passwords used for authentication. UAA users are associated with one or more UAA groups.</p>
+
+<p>We'll start with a typical BOSH Admin. These individuals have full access to BOSH and are responsible for deploying and maintaining BOSH, SHIELD, and Cloud Foundry. Normally, this account would be configured with <code>bosh.admin, uaa.admin, scim.read and scim.write</code> access but we're also adding <code>shield.admin</code> to make the mapping clearer in Step 2. Replace <code>admin</code> with a real person's name or identifier for your own deployment:</p>
+
+<pre><code>properties:  
+  uaa:
+    scim:
+      users:
+      - name: admin
+        groups: [shield.admin, bosh.admin, uaa.admin, scim.read, scim.write]
+        password: admin2
+</code></pre>
+
+<p>To add a user to the Postgres Team, they will need to be placed in their own BOSH team and be able to upload BOSH releases and stemcells. The same needs to be done for the RabbitMQ and Vault team members and is omitted for brevity. Again, replace <code>postgres.admin</code> with a real person's name or identifier.</p>
+
+<pre><code>properties:  
+  uaa:
+    scim:
+      users:
+      - name: postgres.admin
+        groups: [bosh.teams.postgres.admin, bosh.read, bosh.releases.upload, bosh.stemcells.upload]
+        password: psq5432
+</code></pre>
+
+<h3 id="defineauaaclient">Define a UAA Client</h3>
+
+<p>The SHIELD daemon also needs to communicate with UAA to retrieve information about group membership. This is done by configuring a UAA Client, an alternate set of instructions using the <code>uaac</code> client are described <a href="https://github.com/starkandwayne/shield/blob/v8/docs/auth/uaa.md#registering-a-client-with-uaa">here</a>. The only change you need to make for your own deployment is to the <code>redirect-uri</code> which will be the URL to the SHIELD daemon:</p>
+
+<pre><code>properties:  
+  uaa:
+    clients:
+      shield-dev:
+        name: S.H.I.E.L.D.
+        override: true
+        authorized-grant-types: authorization_code
+        scope: openid
+        authorities: uaa.none
+        access-token-validity: 180
+        refresh-token-validity: 180
+        secret: "s.h.i.e.l.d."
+        redirect-uri: http://localhost:8181/auth/uaa1/redir
+</code></pre>
+
+<p>Above, the <code>redirect-uri</code> also contains the name of the UAA instance, called the <code>identifier</code>, which in this example has the value <code>uaa1</code> which will be needed later in Step 2. The "name" of the client <code>shield-dev</code> and the "secret" <code>s.h.i.e.l.d.</code> will also be needed in Step 2.</p>
+
+<h3 id="completeboshmanifestsnippet">Complete BOSH Manifest Snippet</h3>
+
+<p>Putting this all together, here is the full snippet we'll be adding to the BOSH manifest:</p>
+
+<pre><code>properties:  
+  uaa:
+    scim:
+      groups:
+        bosh.read: BOSH Read Only Access
+        bosh.releases.upload: BOSH Releases Upload Group
+        bosh.stemcells.upload: BOSH Stemcell Upload Group
+        bosh.teams.postgres.admin: Postgres Admin Group
+        bosh.teams.rabbitmq.admin: RabbitMQ Admin Group
+        bosh.teams.vault.admin: Vault Admin Group
+        shield.admin: SHIELD System Admin Group
+        shield.manager: SHIELD System Manager Group
+        shield.engineer: SHIELD System Engineering Group
+      users:
+      - name: admin
+        groups: [shield.admin, bosh.admin, uaa.admin, scim.read, scim.write]
+        password: admin2
+      - name: a.security.engineer
+        groups: [shield.engineer, bosh.read, scim.read]
+        password: admin2
+      - name: postgres.admin
+        groups: [bosh.teams.postgres.admin, bosh.read, bosh.releases.upload, bosh.stemcells.upload]
+        password: psq5432
+      - name: rabbitmq.admin
+        groups: [bosh.teams.rabbitmq.admin, bosh.read, bosh.releases.upload, bosh.stemcells.upload]
+        password: rabbit5672
+      - name: vault.admin
+        groups: [bosh.teams.vault.admin, bosh.read, bosh.releases.upload, bosh.stemcells.upload]
+        password: hashi8200
+    clients:
+      shield-dev:
+        name: S.H.I.E.L.D.
+        override: true
+        authorized-grant-types: authorization_code
+        scope: openid
+        authorities: uaa.none
+        access-token-validity: 180
+        refresh-token-validity: 180
+        secret: "s.h.i.e.l.d."
+        redirect-uri: http://localhost:8181/auth/uaa1/redir
+</code></pre>
+
+<p>Now redeploy your BOSH Director so the changes are pushed to the UAA instance on the director.</p>
+
+<p>Note that all of this could have been done using <code>uaac</code> commands however if you have multiple environments, having the groups, users, and clients defined in the BOSH manifest makes it easier to repeat this configuration. The passwords are also easily cracked in this example, use more secure passwords or let <a href="https://docs.cloudfoundry.org/credhub/setup-credhub-bosh.html">credhub automatically create them for you.</a></p>
+
+<h2 id="step2configureuaagroupsmappingtoshieldtenants">Step 2 - Configure UAA Groups Mapping to SHIELD Tenants</h2>
+
+<p>This portion of the configuration is responsible for controlling which authentication providers will be used by SHIELD. This is also where the mapping between UAA Groups, SHIELD Tenants, and Roles are defined. This is done by modifying the deployment manifest for SHIELD.</p>
+
+<h3 id="defineuaaauthenticationprovider">Define UAA Authentication Provider</h3>
+
+<p>Start with the configuring SHIELD to allow <code>uaa</code> to be one of the authentication providers. At the end of Step 1 we configured a UAA Client for the SHIELD daemon. From this we can extract the <code>client_id</code>, <code>client_secret</code> and <code>identifier</code>.</p>
+
+<pre><code>properties:  
+  uaa:
+    clients:
+      shield-dev:                                            #&lt;== Match to client_id:
+        secret: "s.h.i.e.l.d."                               #&lt;== Match to client_secret:
+        redirect-uri: http://localhost:8181/auth/uaa1/redir  #&lt;== `uaa1` matches to the identifier:
+</code></pre>
+
+<p>Now we can start to configure the manifest for SHIELD, the source of information is commented on each line:  </p>
+
+<pre><code>auth:  
+  - name:       Prod BOSH UAA                     #&lt;== This text shows up in the SHIELD login page 
+    identifier: uaa1                              #&lt;== From the BOSH Manifest
+    backend:    uaa                               #&lt;== Must be `uaa`, indicates provider type
+    properties:
+      client_id:       shield-dev                 #&lt;== From the BOSH Manifest
+      client_secret:   s.h.i.e.l.d.               #&lt;== From the BOSH Manifest
+      uaa_endpoint:    https://192.168.50.6:8443  #&lt;== Points to the UAA instance on BOSH
+      skip_verify_tls: true
+</code></pre>
+
+<h3 id="definemappingsboshadminsecurityadmin">Define Mappings - BOSH Admin &amp; Security Admin</h3>
+
+<p>First we will start with the mappings for the BOSH Admin and the Security Admin. There is a special tenant, called the SYSTEM tenant, that exists solely to allow SHIELD site operators to assign system-level rights and roles to UAA group members, based on the same rules as tenant-level role assignment. </p>
+
+<p>The SYSTEM tenant has its own set of assignable roles:</p>
+
+<ul>
+<li>admin - Full control over all of SHIELD.</li>
+<li>manager - Control over tenants and manual role assigments.</li>
+<li>engineer - Control over shared resources like global storage definitions and retention policy templates.</li>
+</ul>
+
+<p>These rights rules are processed until one matches; subsequent rules are skipped.</p>
+
+<p>Here is our use case mapping:</p>
+
+<p><img src="https://raw.githubusercontent.com/cweibel/ghost_blog_pics/master/shield.v8.uaa.bosh.admin.security.admin.png" alt="use cases"></p>
+
+<p>We'll use the <code>System</code> tenant and map the UAA group <code>BOSH Admins</code> are mapped to <code>SHIELD System Admin</code> role in the use case. We are using both <code>bosh.admin</code> and <code>shield.admin</code> in case there were other users defined as <code>bosh.admin</code> manually through <code>uaac</code>.</p>
+
+<p>We also will map the UAA group <code>shield.engineer</code>, which the Security Admin is a part of to the <code>SHIELD System Engineer</code>, that will have a SHIELD role of <code>engineer</code>:</p>
+
+<pre><code>auth:  
+  - name:       Prod BOSH UAA
+    properties:
+      mapping:
+        - tenant: SYSTEM
+          rights:
+            - { scim: bosh.admin,      role: admin }
+            - { scim: shield.admin,    role: admin }
+            - { scim: shield.engineer, role: engineer }
+</code></pre>
+
+<h3 id="definemappingsboshadminfortheboshandcftenant">Define Mappings - BOSH Admin for the BOSH and CF Tenant</h3>
+
+<p>It is also desired to have BOSH Admins control the backups for the BOSH Director database, the SHIELD database, and Cloud Foundry's databases. </p>
+
+<p><img src="https://raw.githubusercontent.com/cweibel/ghost_blog_pics/master/shield.v8.uaa.bosh.ccdb.png" alt="use cases"></p>
+
+<p>For non-SYSTEM tenants valid values for the role field are:</p>
+
+<ul>
+<li>admin - Full control over the tenant.</li>
+<li>engineer - Control over the configuration of stores, targets, retention policies, and jobs.</li>
+<li>operator - Control over running jobs, pausing and unpausing scheduled jobs, and performing restore operations.</li>
+</ul>
+
+<p>In our case we want anyone who is a BOSH Admin to be a BOSH &amp; CF Tenant Admin. To do this, define a SHIELD tenant and associate the BOSH Admins to be a SHIELD admin for this tenant:</p>
+
+<pre><code>auth:  
+  - name:       Prod BOSH UAA
+    properties:
+      mapping:
+        - tenant: BOSH and CF
+          rights:
+            - { scim: bosh.admin, role: admin }
+</code></pre>
+
+<h3 id="definemappingspostgresadmin">Define Mappings - Postgres Admin</h3>
+
+<p>Now we can map the tenant for the Postgres Admin. The Postgres Admin is identified by the UAA group <code>bosh.teams.postgres.admin</code> and we want this person to have complete control of their backups.</p>
+
+<p><img src="https://raw.githubusercontent.com/cweibel/ghost_blog_pics/master/shield.v8.uaa.postgres.admin.png" alt="use cases"></p>
+
+<p>To do this define, a SHIELD tenant named <code>Postgres Team</code>, and associate the UAA Group <code>bosh.teams.postgres.admin</code> for the Postgres Admin with the SHIELD tenant role <code>admin</code> for the Postgres Team tenant:  </p>
+
+<pre><code>auth:  
+  - name:       Prod BOSH UAA
+    properties:
+      mapping:
+        - tenant: Postgres Team
+          rights:
+            - { scim: bosh.teams.postgres.admin, role: admin }
+</code></pre>
+
+<h3 id="definemappingsrabbitmqadmin">Define Mappings - RabbitMQ Admin</h3>
+
+<p>Now we can map the tenant for the RabbitMQ Admin. The RabbitMQ Admin is identified by the UAA group <code>bosh.teams.rabbitmq.admin</code> and we want this person to have complete control of their backups.</p>
+
+<p><img src="https://raw.githubusercontent.com/cweibel/ghost_blog_pics/master/shield.v8.uaa.rabbitmq.admin.png" alt="use cases"></p>
+
+<p>To do this, define a SHIELD tenant named <code>RabbitMQ Team</code> and associate the UAA Group <code>bosh.teams.rabbitmq.admin</code> for the RabbitMQ Admin with the SHIELD tenant role <code>admin</code> for the RabbitMQ Team tenant:  </p>
+
+<pre><code>auth:  
+  - name:       Prod BOSH UAA
+    properties:
+      mapping:
+        - tenant: RabbitMQ Team
+          rights:
+            - { scim: bosh.teams.rabbitmq.admin, role: admin }
+</code></pre>
+
+<h3 id="definemappingsvaultadmin">Define Mappings - Vault Admin</h3>
+
+<p>Now we can map the tenant for the Vault Admin. The Vault Admin is identified by the UAA group <code>bosh.teams.vault.admin</code>, and we want this person to have complete control of their backups.</p>
+
+<p><img src="https://raw.githubusercontent.com/cweibel/ghost_blog_pics/master/shield.v8.uaa.vault.admin.png" alt="use cases"></p>
+
+<p>To do this define a SHIELD tenant named <code>Vault Team</code> and associate the UAA Group <code>bosh.teams.vault.admin</code> for the Vault Admin with the SHIELD tenant role <code>admin</code> for the Vault Team tenant:  </p>
+
+<pre><code>auth:  
+  - name:       Prod BOSH UAA
+    properties:
+      mapping:
+        - tenant: Vault Team
+          rights:
+            - scim: bosh.teams.vault.admin
+              role: admin
+</code></pre>
+
+<h3 id="thecompletemapping">The Complete Mapping</h3>
+
+<p>The full snippet for the defining the UAA authentication provider and mappings is below. Members of the mapped UAA groups will be able to connect to the SHIELD tenants they are mapped to. </p>
+
+<pre><code>auth:  
+  - name:       Prod BOSH UAA
+    identifier: uaa1
+    backend:    uaa
+    properties:
+      client_id:       shield-dev
+      client_secret:   s.h.i.e.l.d.
+      uaa_endpoint:    https://192.168.50.6:8443
+      skip_verify_tls: true
+      mapping:
+        - tenant: SYSTEM                       
+          rights:
+            - { scim: bosh.admin,      role: admin }
+            - { scim: shield.admin,    role: admin }
+            - { scim: shield.engineer, role: engineer }
+
+        - tenant: BOSH and CF
+          rights:
+            - { scim: bosh.admin, role: admin }
+
+        - tenant: Postgres Team               
+          rights:
+            - { scim: bosh.teams.postgres.admin, role: admin }                     
+
+        - tenant: RabbitMQ Team               
+          rights:
+            - { scim: bosh.teams.rabbitmq.admin, role: admin }                
+
+        - tenant: Vault Team     
+          rights:
+            - { scim: bosh.teams.vault.admin, role: admin }
+</code></pre>
+
+<h3 id="selectinguaaauthenticationproviderforlogin">Selecting UAA Authentication Provider for Login</h3>
+
+<p>Once SHIELD is deployed with the configuration for the UAA this authentication provider will be available via the SHIELD UI. The authentication provider defined in <code>auth.name</code> of the SHIELD manifest is what will appear on the login screen, clicking on this will start the UAA interaction:</p>
+
+<p><img src="https://raw.githubusercontent.com/cweibel/ghost_blog_pics/master/shield_v8_login.png" alt="use cases"></p>
+
+<h3 id="logintouaa">Login to UAA</h3>
+
+<p>Now the interaction with UAA is initiated. Enter the username and password of one of the UAA user accounts that was defined in the manifest for BOSH. Note the URL in the browser navigates to the UAA instance on the BOSH Director as defined in <code>auth.properties.uaa_endpoint</code> of the SHIELD manifest. In the screenshot below, we'll login as BOSH Admin: </p>
+
+<p><img src="https://raw.githubusercontent.com/cweibel/ghost_blog_pics/master/shield_v8_uaa_login.png" alt="use cases"></p>
+
+<h3 id="systemtenantcfandboshtenant">System Tenant &amp; CF and BOSH Tenant</h3>
+
+<p>We are now logged in as the BOSH Admin. The BOSH Admin belongs to two SHIELD tenants: <code>SYSTEM</code> and <code>BOSH and CF</code>. Membership to SYSTEM gives the user access to the <code>Admin</code> tab in the UI. Membership to the <code>BOSH and CF</code> tenant allows the other <code>Systems</code>, <code>Storage</code>, and <code>Retention</code> tabs to manage backups for BOSH, CF, and SHIELD database backups:</p>
+
+<p><img src="https://raw.githubusercontent.com/cweibel/ghost_blog_pics/master/shield_v8_bosh_admin_homepage.png" alt="use cases"></p>
+
+<h3 id="postgrestenant">Postgres Tenant</h3>
+
+<p>If instead we had logged in as Postgres Admin we would have access to the <code>Postgres Team</code> tenant but not access to other tenants or the <code>Admin</code> tab:</p>
+
+<p><img src="https://raw.githubusercontent.com/cweibel/ghost_blog_pics/master/shield_v8_postgres_admin_homepage.png" alt="use cases"></p>
+
+<h2 id="nextsteps">Next Steps</h2>
+
+<p>Another supported SHIELD Authentication Provider is Github; it also has the concept of mapping. This involves mapping Github orgs to SHIELD tenants and roles. More about this is <a href="https://github.com/starkandwayne/shield/blob/v8/docs/auth/github.md">here.</a></p>
+
+<p>You can also use a stand-alone deployment of UAA, or even the UAA instance that is included in Cloud Foundry. The example in this blog is based on a real world use case where there are BOSH Teams already leveraged to sandbox BOSH access. There are also tenant roles which were not used because each of the teams have a few people all with the same responsibilities to their teams. The additional tenant roles can be used for teams where team members have different roles and responsibilities.</p>
+
+<p>Everyone deserves nice things, if there is another use case you would like to discuss, please contact us!  There is a Slack channel <code>#help</code> in <a href="https://shieldproject.slack.com">shieldproject.slack.com</a> or simply reply to this blog post.</p>]]></content:encoded></item><item><title><![CDATA[Multi CPI BOSH: One BOSH to Rule Them All]]></title><description><![CDATA[<h3 id="awsandvsphereandopenstackohmy">AWS, and vSphere, and OpenStack.. Oh My!!!!</h3>
+
+<p>Lately, we've been playing with a feature that has us pretty excited. Multi-CPI BOSH has become a reality and we couldn't wait to take it for test drive. With this feature we can target multiple and disparate IaaS from a single BOSH environment.</p>]]></description><link>http://www.starkandwayne.com/blog/multi-cpi-bosh-one-bosh-to-rule-them-all/</link><guid isPermaLink="false">7875b919-c726-44fb-92d2-aff6b1f47882</guid><dc:creator><![CDATA[Bill Chapman]]></dc:creator><pubDate>Wed, 06 Dec 2017 18:49:16 GMT</pubDate><content:encoded><![CDATA[<h3 id="awsandvsphereandopenstackohmy">AWS, and vSphere, and OpenStack.. Oh My!!!!</h3>
+
+<p>Lately, we've been playing with a feature that has us pretty excited. Multi-CPI BOSH has become a reality and we couldn't wait to take it for test drive. With this feature we can target multiple and disparate IaaS from a single BOSH environment. </p>
+
+<h3 id="showmeshowmeshowmehowyoudothattrick">Show Me, Show Me, Show Me, How you do that trick?!</h3>
+
+<p>The basic process for adding Multiple CPI's to a single BOSH environment is as follows: </p>
+
+<ul>
+<li>Ensure you are on a BOSH release with adequate support (263+)</li>
+<li>Add an additional CPI Config to override the default <code>bosh update-cpi-config</code></li>
+<li>Update Availability Zones in Cloud Config <code>bosh update-cloud-config</code></li>
+<li>Upload and fix stemcells <code>bosh upload-stemcell</code></li>
+<li>Assign appropriate AZ's to your deployment</li>
+<li>Profit? </li>
+</ul>
+
+<h3 id="whichboshversionisbest">Which BOSH Version is Best?</h3>
+
+<p>Support was officially added in BOSH <a href="https://github.com/cloudfoundry/bosh/releases/tag/v261">v261</a> but as of this writing we find the best experience to be with <a href="https://github.com/cloudfoundry/bosh/releases/tag/v263">v263</a> or greater. If you <a href="https://github.com/cloudfoundry/bosh/releases">keep tabs on releases</a> you'll see that CPI related work is common in the release notes. If you run in to any issues, it's always a good idea to test with the latest release. </p>
+
+<p>You'll also need a recent BOSH CLI version. Learn more and find installation instructions at <a href="https://bosh.io/docs/cli-v2.html">https://bosh.io/docs/cli-v2.html</a> and <a href="https://apt.starkandwayne.com">https://apt.starkandwayne.com</a>.</p>
+
+<h3 id="anotherconfigtomanagebahhumbug">Another Config to Manage? Bah, Humbug!</h3>
+
+<p>This feature is possible because of the great work that has been done to separate concerns between manifest files. More deployment manifest files to manage is a feature, and it's worth it.</p>
+
+<p>We start by updating the CPI Config. For the most part, the config definition is identical to how it looked before, it's just in a new location. One interesting caveat we ran into is that if your new CPI config is wrong, in some cases your deployment can fall back to the default config, making troubleshooting difficult. Also, there are some minor inconsistencies in the CPI config schema. For example, we had to change the <code>address:</code> key to <code>host:</code> when we moved our vSphere config in to the new scheme. </p>
+
+<p>As of this writing, you can find OpenStack and vSphere examples in the <a href="https://bosh.io/docs/cpi-config.html">CPI-Config documentation</a> and we've tested both of these example schemas. </p>
+
+<p>So work out your CPI config based on the docs and upload to your BOSH environment. </p>
+
+<pre><code class="language-bash">bosh update-cpi-config cpi-config.yml  
+</code></pre>
+
+<h3 id="availourselvesincpisupremacy">Avail Ourselves in CPI Supremacy!</h3>
+
+<p>Now that we have multiple CPI's defined, we need to assign them to availability zones; this is the magic that makes it all work. You simply supply the new CPI to the AZ definition in your cloud-config.</p>
+
+<pre><code class="language-yaml">azs:  
+- name: z1
+  cpi: my-vsphere-cpi-name
+- name: z2
+  cpi: m-openstack-cpi-name
+  cloud_properties:
+    availability_zone: actual-openstack-az-name
+</code></pre>
+
+<p>And update your cloud config. </p>
+
+<pre><code class="language-bash">bosh update-cloud-config my-cloud-config.yml  
+</code></pre>
+
+<h3 id="anoteaboutnetworking">A Note About Networking.</h3>
+
+<p>Your cloud config will probably get a bit more complicated. For the simplest "hello world" deployment across multiple IaaS you'll need to provide network configurations in cloud config that your target IaaS is configured to support. For testing more complicated situations, such as spreading deployments across multiple IaaS flavors, you may need to provide single networking configurations that can be supported by both IaaS. </p>
+
+<h3 id="dontdreaddeprecateddeployments">Don't Dread deprecated Deployments!</h3>
+
+<p>Keep in mind that every time you update your cloud config, all of the deployments on that director will become outdated; even if you've not changed a configuration relevant to that deployment. You'll have to decide how  you want to manage this state change problem. Currently, toggling the deployment state back to normal requires a redeployment.</p>
+
+<p>However, if you haven't changed anything that deployment cares about, like adding a CPI config to be used by a different deployment, you can decide if ignoring the state change until next deployment is a reasonable compromise.</p>
+
+<h3 id="stemcellsschmemcells">Stemcells Schmemcells!</h3>
+
+<p>Now that we've updated our BOSH environment to be aware of more than one IaaS, the first difference we'll notice is that there is a CPI column in the output of <code>bosh stemcells</code>. In order to make your first deployment, you'll need to ensure that your stemcell/CPI pairings are in order.</p>
+
+<p>Stemcells are only assigned to a CPI when they are uploaded, so if you've already uploaded stemcells, you'll need to re-upload and fix them with <code>--fix</code>.</p>
+
+<pre><code class="language-bash">bosh upload-stemcell https://url/to/stemcell.tgz --fix  
+</code></pre>
+
+<p>If you haven't yet uploaded any stemcells, you can just upload them normally and the CPI will get assigned. </p>
+
+<h3 id="readytorumble">Ready to Rumble!</h3>
+
+<p>So theoretically, we now have a BOSH environment that can target more than one IaaS endpoint and provision a deployment with the appropriate CPI and stemcell. The deployment itself doesn't change, just tell it which availability zones to use.</p>
+
+<h3 id="greatbutwhywouldiwanttodothis">Great! But, Why Would I Want to do This?</h3>
+
+<p>As of this writing, we've been able to use this feature to deploy distinct deployments from a single BOSH across multiple IaaS. In our testing, targeting an OpenStack and a vSphere from a single BOSH environment worked fairly well. What we did not try, was spreading a single, multiple AZ BOSH deployment across multiple IaaS flavors. However, this is something that should be possible, as long as your networking is set up correctly, and we are looking forward to playing with that idea more. </p>
+
+<p>Our first use for the feature will probably be incorporating in to our Proto-BOSH paradigm, this is the inception BOSH  environment that we use to bring up other BOSH environments. </p>
+
+<h3 id="justthedocsmaam">Just the Docs Ma'am!</h3>
+
+<p>A discussion about the ability to target multiple IaaS from a single BOSH  environment first showed up in the 
+<a href="https://github.com/cloudfoundry/bosh-notes/blob/master/proposals/multi-cpi.md">bosh-notes</a> repository and that has some good thoughts on the history and intended use of the feature. Most other details can be found in the BOSH documentation for <a href="https://bosh.io/docs/cpi-config.html">CPI-Config</a> and <a href="https://bosh.io/docs/cpi-config.html">Cloud-Config</a></p>
+
+<h3 id="whatsnext">What's Next?</h3>
+
+<p>We are looking forward to seeing where this feature can take our deployment paradigms and best practices. In its current form we think it will be very useful. If you get some time to play with it, let us know in the comments below. </p>]]></content:encoded></item><item><title><![CDATA[Deploy Kubernetes to an Existing BOSH Environment]]></title><description><![CDATA[Kubernetes is one of the newest components of a larger Cloud Foundry, and for the first time, here are instructions for deploying CFCR to your existing BOSH]]></description><link>http://www.starkandwayne.com/blog/deploy-kubernetes-to-an-existing-bosh-environment/</link><guid isPermaLink="false">e997f2cb-8b15-4d06-827a-30ee14df50f5</guid><category><![CDATA[kubernetes]]></category><category><![CDATA[cfcr]]></category><category><![CDATA[bosh]]></category><category><![CDATA[bosh2]]></category><dc:creator><![CDATA[Dr Nic Williams]]></dc:creator><pubDate>Fri, 01 Dec 2017 22:23:41 GMT</pubDate><content:encoded><![CDATA[<p>Coming to SpringOnePlatform next week? Myself (Dr Nic) and many Stark &amp; Wayne team members will be in the Community Hub to talk about Kubernetes/CFCR, Cloud Foundry, Kafka, SHIELD and more. Come find us!</p>
+
+<p>Kubernetes is one of the newest components of a larger Cloud Foundry, deployed with BOSH, and known as CFCR - the Cloud Foundry Container Runtime (previously known as Kubo). But the current documentation at <a href="https://docs-cfcr.cfapps.io/">https://docs-cfcr.cfapps.io/</a> does not work with an existing BOSH environment; it expects to deploy its own bastian/jumpbox and BOSH environment. I already have a BOSH environment. Lots of them. And I want to run Kubernetes on them.</p>
+
+<p>So, I rewrote the deployment manifests so that it is fun and easy to deploy Kubernetes to an existing BOSH environment.</p>
+
+<p>How fun you might ask? This fun:</p>
+
+<pre><code>git clone https://github.com/drnic/kubo-deployment -b stable-0.9.0  
+export BOSH_DEPLOYMENT=cfcr  
+bosh deploy kubo-deployment/manifests/cfcr.yml  
+</code></pre>
+
+<p>That's it. It will fetch all the BOSH releases, provision infrastructure on your favourite Cloudy IaaS (e.g. AWS, GCP, Azure, vSphere, OpenStack), and run a single Kubernetes API on one <code>master</code> instance and three Kubelets on <code>worker</code> instances.</p>
+
+<p>Before running the commands above, check the <a href="http://www.starkandwayne.com/blog/deploy-kubernetes-to-an-existing-bosh-environment/#requirements">Requirements</a> section at the bottom of this post.</p>
+
+<pre><code>Instance                                     Process State  AZ  IPs  
+master/bde7bc5a-a9fd-4bcc-9ba7-b66752fad159  running        z1  10.10.1.20  
+worker/4518c694-3328-4538-bc08-dedf8a3bf400  running        z1  10.10.1.22  
+worker/49d317d0-dff2-44a3-b00c-0406ce8a010e  running        z1  10.10.1.23  
+worker/e00ac851-fadb-4b7d-94c4-8917042ba6cb  running        z1  10.10.1.21  
+</code></pre>
+
+<p>You can now configure <code>kubectl config</code> for the API running on port <code>8443</code>.</p>
+
+<p>You'll need the <code>master/0</code> host IP and the admin password:</p>
+
+<pre><code>master_host=$(bosh int &lt;(bosh instances --json) --path /Tables/0/Rows/0/ips)
+
+admin_password=$(bosh int &lt;(credhub get -n "${BOSH_ENVIRONMENT}/${BOSH_DEPLOYMENT}/kubo-admin-password" --output-json) --path=/value)  
+</code></pre>
+
+<p>Finally, setup your local kubectl configuration:</p>
+
+<pre><code>cluster_name="cfcr:${BOSH_ENVIRONMENT}:${BOSH_DEPLOYMENT}"  
+user_name="cfcr:${BOSH_ENVIRONMENT}:${BOSH_DEPLOYMENT}-admin"  
+context_name="cfcr:${BOSH_ENVIRONMENT}:${BOSH_DEPLOYMENT}"
+
+kubectl config set-cluster "${cluster_name}" \  
+  --server="https://${master_host}:8443" \
+  --insecure-skip-tls-verify=true
+kubectl config set-credentials "${user_name}" --token="${admin_password}"  
+kubectl config set-context "${context_name}" --cluster="${cluster_name}" --user="${user_name}"  
+kubectl config use-context "${context_name}"  
+</code></pre>
+
+<p>To confirm that you are connected and configured to your Kubernetes cluster:</p>
+
+<pre><code>$ kubectl get all
+NAME             TYPE        CLUSTER-IP     EXTERNAL-IP   PORT(S)   AGE  
+svc/kubernetes   ClusterIP   10.100.200.1   &lt;none&gt;        443/TCP   2h  
+</code></pre>
+
+<h3 id="deployelasticsearch">Deploy Elastic Search</h3>
+
+<p>There is a handy repo filled with example Kubernetes deployments for those of use who don't know anything about such things yet. We just want to see systems running.</p>
+
+<p>Below is the example from <a href="https://github.com/kubernetes/examples/tree/master/staging/elasticsearch">https://github.com/kubernetes/examples/tree/master/staging/elasticsearch</a></p>
+
+<pre><code>git clone https://github.com/kubernetes/examples kubernetes-examples  
+cd kubernetes-examples  
+kubectl create -f staging/elasticsearch/service-account.yaml  
+kubectl create -f staging/elasticsearch/es-svc.yaml  
+kubectl create -f staging/elasticsearch/es-rc.yaml  
+kubectl create -f staging/elasticsearch/rbac.yaml  
+</code></pre>
+
+<p>This deploys a 1-instance cluster of ElasticSearch. </p>
+
+<pre><code>$ kubectl get pods
+NAME       READY     STATUS    RESTARTS   AGE  
+es-47mrc   1/1       Running   0          2m  
+</code></pre>
+
+<p>Scaling and replication across the cluster is as delightful as:</p>
+
+<pre><code>kubectl scale --replicas=3 rc es  
+</code></pre>
+
+<p>Our cluster has grown:</p>
+
+<pre><code>$ kubectl get pods
+NAME       READY     STATUS    RESTARTS   AGE  
+es-95h78   1/1       Running   0          3m  
+es-q8q2v   1/1       Running   0          6m  
+es-qdcnd   1/1       Running   0          3m
+
+$ kubectl get service elasticsearch
+NAME            TYPE           CLUSTER-IP       EXTERNAL-IP   PORT(S)                         AGE  
+elasticsearch   LoadBalancer   10.100.200.142   &lt;pending&gt;     9200:32190/TCP,9300:31042/TCP   59s  
+</code></pre>
+
+<h3 id="cloudfoundryrouting">Cloud Foundry Routing</h3>
+
+<p>To access our ElasticSearch cluster from outside of Kubernetes - such as from a Cloud Foundry application or from a BOSH deployment - will require a routing layer.</p>
+
+<p>You're probably reading this because you've already got BOSH and Cloud Foundry. So I'll skip to the good bit - exposing CFCR/Kubernetes services to the HTTP and TCP routing layers.</p>
+
+<p>Redeploy your CFCR BOSH deployment with an additional operator file and some variables:</p>
+
+<p>First, delete the TLS certificates which do not have the new TCP hostname that we will use to access Kubernetes API. These will be regenerated automatically when we run <code>bosh deploy</code> again:</p>
+
+<pre><code>credhub delete -n /$BOSH_ENVIRONMENT/$BOSH_DEPLOYMENT/tls-kubernetes  
+credhub delete -n /$BOSH_ENVIRONMENT/$BOSH_DEPLOYMENT/tls-kubelet  
+</code></pre>
+
+<p>Create a <code>cf-vars.yml</code> with the following YAML format. The values will come from your Cloud Foundry deployment:</p>
+
+<pre><code>kubernetes_master_host: tcp.apps.mycompany.com  
+kubernetes_master_port: 8443  
+routing-cf-api-url: https://api.system.mycompany.com  
+routing-cf-uaa-url: https://uaa.system.mycompany.com  
+routing-cf-app-domain-name: apps.mycompany.com  
+routing-cf-client-id: routing_api_client  
+routing-cf-client-secret: &lt;&lt;credhub get -n my-bosh/cf/uaa_clients_routing_api_client_secret&gt;&gt;  
+routing-cf-nats-internal-ips: [10.10.1.6,10.10.1.7,10.10.1.8]  
+routing-cf-nats-port: 4222  
+routing-cf-nats-username: nats  
+routing-cf-nats-password: &lt;&lt;credhub get -n my-bosh/cf/nats_password&gt;&gt;  
+</code></pre>
+
+<p>Alternately, you can try a helper script which might be able to use <code>bosh</code>, <code>cf</code>, and <code>credhub</code> CLIs to look up all the information:</p>
+
+<pre><code>./kubo-deployment/manifests/helper/cf-routing-vars.sh &gt; cf-vars.yml
+</code></pre>
+
+<p>I find the latter approach only slightly less ugly than the first. In the future, ideally, Cloud Foundry will expose BOSH links to discover its API endpoints, UAA clients, etc. Then this step will go away and there should be no need for a <code>cf-vars.yml</code> file. One day.</p>
+
+<p>Finally, deploy CFCR again with HTTP/TCP routing:</p>
+
+<pre><code>bosh deploy kubo-deployment/manifests/cfcr.yml \  
+  -o kubo-deployment/manifests/ops-files/cf-routing.yml \
+  -l cf-vars.yml
+</code></pre>
+
+<p>This may fail with the following; but I'm not yet sure if its a bad failure or an annoying failure.</p>
+
+<pre><code>Task 1331 | 22:01:56 | Error: Action Failed get_task: Task 674bebba-0054-4262-486d-e386c145d43b result: 1 of 1 post-deploy scripts failed. Failed Jobs: kubernetes-system-specs.  
+</code></pre>
+
+<p>Once this has completed, you can now start labeling your Kubernetes services, and the <code>route-sync</code> job will automatically and continuously advertise your service to the HTTP or TCP routing tiers.</p>
+
+<p>First, re-configure <code>kubectl config</code> to our new HTTPS-enabled Kubernetes API endpoint.</p>
+
+<p>You'll need the new HTTPS hostname and the admin password:</p>
+
+<pre><code>master_host=$(bosh int cf-vars.yml --path /kubernetes_master_host)
+
+admin_password=$(bosh int &lt;(credhub get -n "${BOSH_ENVIRONMENT}/${BOSH_DEPLOYMENT}/kubo-admin-password" --output-json) --path=/value)  
+</code></pre>
+
+<p>Now, set up your local kubectl configuration:</p>
+
+<pre><code>rm ~/.kube/config  
+cluster_name="cfcr:${BOSH_ENVIRONMENT}:${BOSH_DEPLOYMENT}"  
+user_name="cfcr:${BOSH_ENVIRONMENT}:${BOSH_DEPLOYMENT}-admin"  
+context_name="cfcr:${BOSH_ENVIRONMENT}:${BOSH_DEPLOYMENT}"
+
+kubectl config set-cluster "${cluster_name}" \  
+  --server="https://${master_host}:8443" \
+  --insecure-skip-tls-verify=true
+kubectl config set-credentials "${user_name}" --token="${admin_password}"  
+kubectl config set-context "${context_name}" --cluster="${cluster_name}" --user="${user_name}"  
+kubectl config use-context "${context_name}"  
+</code></pre>
+
+<p>To register an HTTP route <code>https://myelastic.apps.mycompany.com</code> to route to your Elastic HTTP API:</p>
+
+<pre><code>kubectl label service elasticsearch http-route-sync=myelastic  
+</code></pre>
+
+<p>The route will take a few moments to appear:</p>
+
+<pre><code>$ curl -k https://myelastic.apps.mycompany.com502 Bad Gateway: Registered endpoint failed to handle the request.
+$ curl -k https://myelastic.apps.mycompany.com
+{
+  "name" : "f6a77df3-a1ae-42a6-b749-87e3a7e88906",
+  "cluster_name" : "myesdb",
+  "cluster_uuid" : "ErRYBEU8QHChXeOV0NOhsA",
+  "version" : {
+    "number" : "5.6.2",
+    "build_hash" : "57e20f3",
+    "build_date" : "2017-09-23T13:16:45.703Z",
+    "build_snapshot" : false,
+    "lucene_version" : "6.6.1"
+  },
+  "tagline" : "You Know, for Search"
+}
+</code></pre>
+
+<p>To assign yourself public port <code>:9300</code> on the TCP routing tier <code>tcp.apps.mycompany.com:9300</code>:</p>
+
+<pre><code>kubectl label service elasticsearch tcp-route-sync=9300  
+</code></pre>
+
+<h3 id="cloudproviders">Cloud Providers</h3>
+
+<p>You can expose your Kubernetes to your underlying Cloud IaaS using an operator file. Look in <code>manifests/ops-files/iaas/&lt;your-iaas&gt;/cloud-provider.yml</code> and fill in the variables.</p>
+
+<h3 id="requirements">Requirements</h3>
+
+<p>There are a few requirements for your BOSH environment:</p>
+
+<ul>
+<li>Credhub/UAA (add <code>-o uaa.yml -o credhub.yml</code> to your <code>bosh create-env</code> installation)</li>
+<li>Cloud Config with <code>vm_types</code> named <code>minimal</code>, <code>small</code>, and <code>small-highmem</code> as per similar requirements of <a href="https://github.com/cloudfoundry/cf-deployment">cf-deployment</a></li>
+<li>Cloud Config has a network named <code>default</code>as per similar requirements of <a href="https://github.com/cloudfoundry/cf-deployment">cf-deployment</a></li>
+<li>BOSH instances must be normal VMs, not garden containers (i.e.  CFCR does not deploy to bosh-lite)</li>
+<li>Ubuntu Trusty stemcell <code>3468</code> is already uploaded (it's up to you to keep up to date with latest <code>3468.X</code> versions and update your BOSH deployments)</li>
+</ul>
+
+<p><strong>If you do not have Credhub</strong>, you can use the following additional flags to your <code>bosh deploy</code> commands above <code>--vars-store creds.yml -o kubo-deployment/manifests/ops-files/misc/local-config-server.yml</code> (the base manifest assumes Credhub, and the <code>local-config-server.yml</code> operator removes the <code>options.organization</code> property that <code>bosh</code> CLI does not support locally).</p>
+
+<p>For example:</p>
+
+<pre><code>bosh deploy kubo-deployment/manifests/cfcr.yml \  
+  --vars-store creds.yml \
+  -o kubo-deployment/manifests/ops-files/misc/local-config-server.yml
+</code></pre>
+
+<h3 id="futureofthiswork">Future of this Work</h3>
+
+<p>Thanks very much to George Lestaris (CFCR PM) and Konstantin Semenov (CFCR Anchor) for helping me all week to get this working. You're awesome.</p>
+
+<p>An experience like <code>bosh deploy manifests/cfcr.yml</code> will appear in upstream <a href="https://github.com/cloudfoundry-incubator/kubo-deployment">https://github.com/cloudfoundry-incubator/kubo-deployment</a> in the coming weeks. I'll update the blog post for the revised instructions/operator files at that time. </p>
+
+<p>The "Kubo" team has been working very hard on the CFCR/Kubo project all year. It is very exciting to see Kubernetes "just work" and to start playing with it. I look forward to extending this blog post with newer posts in the future. What's interesting to you?</p>]]></content:encoded></item><item><title><![CDATA[What Apps are Running on a Diego Cell]]></title><description><![CDATA[<p>Ever wonder which applications are running on a particular Diego cell?</p>
+
+<p>There is a nifty article on the <a href="https://discuss.pivotal.io/hc/en-us/articles/226228668-How-to-find-what-apps-are-running-in-a-Diego-cell">Pivotal Knowledge Base</a> which goes through how to find this info in <code>PCF 1.7</code>. This points us to getting the list of application process guids for the cell by curling <code>rep</code></p>]]></description><link>http://www.starkandwayne.com/blog/what-apps-are-running-on-a-diego-cell/</link><guid isPermaLink="false">178b9dea-1e9d-4ff0-af18-6fa8468da225</guid><category><![CDATA[author-cweibel]]></category><category><![CDATA[cloudfoundry]]></category><category><![CDATA[Diego]]></category><category><![CDATA[CF_cli]]></category><dc:creator><![CDATA[Chris Weibel]]></dc:creator><pubDate>Tue, 28 Nov 2017 19:49:35 GMT</pubDate><content:encoded><![CDATA[<p>Ever wonder which applications are running on a particular Diego cell?</p>
+
+<p>There is a nifty article on the <a href="https://discuss.pivotal.io/hc/en-us/articles/226228668-How-to-find-what-apps-are-running-in-a-Diego-cell">Pivotal Knowledge Base</a> which goes through how to find this info in <code>PCF 1.7</code>. This points us to getting the list of application process guids for the cell by curling <code>rep</code>.  The user Muni Chada in the comments of the article points out how to use the certificates for <code>rep</code> to make the https call.</p>
+
+<p>Combining these two you can get the list of applications:</p>
+
+<pre><code>cd /var/vcap/jobs/rep/config/certs; \  
+curl -k -s https://localhost:1801/state --cert server.crt \  
+--key server.key | python -m json.tool |grep process_guid | \
+cut -d ':' -f2|cut -c 3-38| \  
+xargs -I '&lt;guid&gt;' cf curl '/v2/apps/&lt;guid&gt;'| \  
+grep '"name"'|cut -d ':' -f2|sort -u  
+</code></pre>
+
+<p>Which outputs something similar to:</p>
+
+<pre><code> "cf-env",
+ "spring-music",
+ "spring-music2",
+ "spring-music3",
+ "spring-music4",
+ "spring-music5",
+ "spring-music6",
+ "spring-music243",
+</code></pre>
+
+<p>The command above has a few dependencies:</p>
+
+<ul>
+<li>You can <code>bosh ssh</code> onto the cell.</li>
+<li>The cell has the CF CLI installed.  We colocate the <a href="https://github.com/cloudfoundry-community/toolbelt-boshrelease">toolbelt-boshrelease</a> on every deployment so we already have the CF CLI available without manually installing it.</li>
+<li>You've done a <code>cf login</code> </li>
+</ul>
+
+<p>Tada!</p>
+
+<p>Here are a few helpful articles to figure out what is running in CF:</p>
+
+<ul>
+<li>Nifty scripts for discovering which apps are known to the Cloud Controller: <a href="http://www.starkandwayne.com/blog/admin-scripting-your-way-around-cloud-foundry/">http://www.starkandwayne.com/blog/admin-scripting-your-way-around-cloud-foundry/</a></li>
+<li>Get the list of cells an application is running on: <a href="http://www.starkandwayne.com/blog/connecting-to-a-container-in-cloud-foundry/">http://www.starkandwayne.com/blog/connecting-to-a-container-in-cloud-foundry/</a></li>
+</ul>]]></content:encoded></item><item><title><![CDATA[Save 85% on your Cloud Foundry and Kubernetes hosting bill with this one simple trick]]></title><description><![CDATA[Running your own Cloud Foundry will give you large hosting bills. Allow me to introduce Spot instances and the magical ancient lost AWS region of Ohio.]]></description><link>http://www.starkandwayne.com/blog/save-85-on-your-cloud-foundry-hosting-bill-with-this-one-simple-trick/</link><guid isPermaLink="false">a114f6a2-398e-42b9-8ee0-6fd46e937460</guid><category><![CDATA[bosh]]></category><category><![CDATA[bosh2]]></category><category><![CDATA[AWS]]></category><dc:creator><![CDATA[Dr Nic Williams]]></dc:creator><pubDate>Mon, 27 Nov 2017 21:54:56 GMT</pubDate><content:encoded><![CDATA[<p><img src="https://s3.amazonaws.com/dingo-s3-544e680a-902c-44c1-ab35-94b372e1b39e/2017/11/spot-bill.png" alt="spot-bill"></p>
+
+<p>Running your own Cloud Foundry will give you large hosting bills. Kubernetes, whilst having a substantially smaller initial footprint, will still run up a reasonable hosting bill each month. </p>
+
+<p>If only there was a way to save 85% of your monthly bill! </p>
+
+<p>Allow me to introduce you to the BOSH AWS CPI property <code>spot_bid_price</code> and to the magical ancient lost AWS region of Ohio.</p>
+
+<p><img src="https://s3.amazonaws.com/dingo-s3-544e680a-902c-44c1-ab35-94b372e1b39e/2017/11/ohio_tourism_logo.png" alt="ohio-tourism-logo"></p>
+
+<p>"O-hi-o". Get it? Ohio has the best tourism logo. And the best AWS region.</p>
+
+<p>"<a href="https://aws.amazon.com/ec2/spot/">AWS Spot Instances</a> allow you to bid on spare Amazon EC2 computing capacity... at a discount compared to On-Demand pricing"  This is an exciting sentence. But how much of a discount? And, how spare is this capacity? Is it spare enough that you could run long-running systems with reasonable uptime?</p>
+
+<p>Downtime is what happens at the end of uptime. Spot instances allow you to provision EC2 instances and eventually AWS might want the capacity back to give to some higher paying customer. Your uptime will end and your downtime will begin. You will need some orchestration system to automatically begin re-provisioning new Spot instances, then reattaching persistent disks, restarting processes etc.</p>
+
+<p>Fortunately, the DevOps communities have <a href="https://bosh.io">BOSH</a> to provide this service. It will keep trying to resurrect your lost servers until they come back. So BOSH plus Spot instances seem like a match made in heaven.</p>
+
+<p>But still, the two questions remain: how spare is this spare capacity?; and how much of a discount?</p>
+
+<p>Allow me to introduce you to my new favorite state of America: Ohio. It's the home to a new cheap AWS region. Cheap like Virginia (us-east-1) and Oregon (us-west-2). Cheap and unused.</p>
+
+<p>Unused capacity means low Spot prices, few spikes in price, and few occasions where you might have your uptime turned to downtime. The graph for <code>m4.large</code> instances over the last three months is delightfully flat. The price sits around $0.015 per hour (an 85% discount on the retail $0.10 per hour price) and spiked to $0.03 per hour once.</p>
+
+<p><img src="https://s3.amazonaws.com/dingo-s3-544e680a-902c-44c1-ab35-94b372e1b39e/2017/11/spot-history-ohio-3mth.png" alt="spot-history"></p>
+
+<h3 id="howdoibuynow">How do I buy now?</h3>
+
+<p>I'm glad you asked. For you, my fellow BOSH user, I throw in some free configuration advice.</p>
+
+<p>You can move some or all of your BOSH instances to become Spot instances by adding one line of configuration into your Cloud Config.</p>
+
+<p>To save your current Cloud Config to a file:</p>
+
+<pre><code>bosh cloud-config &gt; cloud-config.yml  
+</code></pre>
+
+<p>Now modify some/all of your <code>vm_types</code> to add the <code>spot_bid_price</code> property to your <code>cloud_properties</code>.</p>
+
+<pre><code>vm_types:  
+- name: default
+  cloud_properties:
+    spot_bid_price: 0.05
+</code></pre>
+
+<p>Now update your Cloud Config:</p>
+
+<pre><code>bosh update-cloud-config cloud-config.yml  
+</code></pre>
+
+<p>Next time you <code>bosh deploy</code> your BOSH deployments that use <code>vm_type: default</code> those existing VMs will be deleted and re-provisioned as Spot instances. Any attached persistent disks will be reattached. Any running processes will be restarted. Life will continue at a discount of 85%.</p>]]></content:encoded></item><item><title><![CDATA[Helpful CCDB Queries to Show Active Organizations]]></title><description><![CDATA[<p>I will likely get dirty looks for querying the CCDB directly but I'm a recovering DBA.  API endpoints are nice, I like database queries.  If you don't know how to connect to the CCDB database you probably shouldn't be using this blog post :)</p>
+
+<p>To get the list of Organizations and</p>]]></description><link>http://www.starkandwayne.com/blog/helpful-ccdb-queries-to-show-active-organizations/</link><guid isPermaLink="false">fddc0895-ae81-4783-8eb0-38f4b43849d1</guid><category><![CDATA[author-cweibel]]></category><category><![CDATA[ccdb]]></category><dc:creator><![CDATA[Chris Weibel]]></dc:creator><pubDate>Thu, 16 Nov 2017 19:27:47 GMT</pubDate><content:encoded><![CDATA[<p>I will likely get dirty looks for querying the CCDB directly but I'm a recovering DBA.  API endpoints are nice, I like database queries.  If you don't know how to connect to the CCDB database you probably shouldn't be using this blog post :)</p>
+
+<p>To get the list of Organizations and the number of application instances they've started in the last 7 days:</p>
+
+<pre><code class="language-sql">SELECT  
+  sum(processes.instances) as app_instance_count,
+  organizations.name
+FROM  
+  processes, 
+  apps, 
+  spaces, 
+  organizations 
+WHERE  
+  processes.app_guid=apps.guid and 
+  apps.space_guid=spaces.guid and
+  spaces.organization_id=organizations.id and
+  processes.state='STARTED' and 
+  processes.created_at &gt; DATE(NOW()) - INTERVAL 7 DAY 
+GROUP BY  
+  organizations.id, 
+  organizations.name 
+ORDER BY 1 desc;  
+</code></pre>
+
+<p>To get the list of Organizations and how much RAM their running application instances have reserved:  </p>
+
+<pre><code class="language-sql">SELECT  
+  sum(processes.memory * processes.instances) AS memory_reserved,  
+  organizations.name 
+FROM  
+  processes, 
+  apps, 
+  spaces, 
+  organizations 
+WHERE  
+  processes.app_guid=apps.guid and 
+  apps.space_guid=spaces.guid and
+  spaces.organization_id=organizations.id and
+  processes.state='STARTED' 
+GROUP BY  
+  organizations.id, 
+  organizations.name 
+ORDER BY 1 desc;  
+</code></pre>]]></content:encoded></item><item><title><![CDATA[Install any Debian package with your Cloud Foundry app]]></title><description><![CDATA[<p>Cloud Foundry can be wonderfully simple to use for 99% of web applications. It is now even more wonderful and more simple by allowing us to install Debian packages. Cloud Foundry containers do not grant root access, so installing Debian packages has not been possible. But it now is with</p>]]></description><link>http://www.starkandwayne.com/blog/install-any-debian-package-with-your-cloud-foundry-app/</link><guid isPermaLink="false">aca70396-2b35-4bc4-975f-5982d3988d4e</guid><dc:creator><![CDATA[Dr Nic Williams]]></dc:creator><pubDate>Tue, 07 Nov 2017 16:22:48 GMT</pubDate><content:encoded><![CDATA[<p>Cloud Foundry can be wonderfully simple to use for 99% of web applications. It is now even more wonderful and more simple by allowing us to install Debian packages. Cloud Foundry containers do not grant root access, so installing Debian packages has not been possible. But it now is with the <a href="https://github.com/cloudfoundry/apt-buildpack/">apt buildpack</a>.</p>
+
+<p>With or without extra Debian packages, deploying Cloud Foundry applications is always simple:</p>
+
+<pre><code>cf push  
+</code></pre>
+
+<p>So easy. So delightful.</p>
+
+<p>1% of the time, my application has some niche dependency. A package that isn't pre-installed on the base image of a Cloud Foundry container or a dependency that the buildpack doesn't natively support.</p>
+
+<p>For example, I wanted to build a mini admin UI for some BOSH environments. The BOSH director does have an API, but there is only a formal client library <a href="https://github.com/cloudfoundry/bosh-cli/#client-library">in Golang</a>. Fortunately, the <code>bosh</code> CLI is fast and most commands have JSON output.</p>
+
+<p>I realized I could get a long way by writing my UI in Ruby on Rails and invoke the <code>bosh</code> CLI to interact with a BOSH director.</p>
+
+<p>Even better, the <code>bosh</code> CLI uses environment variables for targeting and authentication -- which matches perfectly with how Cloud Foundry likes to configure its running applications.</p>
+
+<p>Here's an <a href="https://github.com/cloudfoundry-community/bosh-cli-web-demo">example of a Ruby application</a> that uses a Debian packaged version of the <code>bosh</code> CLI, and hidden environment variables for configuration, to interact with a BOSH environment.:</p>
+
+<p><a href="https://github.com/cloudfoundry-community/bosh-cli-web-demo"><img src="https://github.com/cloudfoundry-community/bosh-cli-web-demo/raw/master/public/bosh-ui-demo.png" alt="bosh-demo" title=""></a></p>
+
+<p>Conveniently, I had packaged the <code>bosh</code> CLI as a <a href="https://apt.starkandwayne.com/">Debian package</a> recently. All I needed was a way to install my bespoke Debian package from my bespoke <a href="https://apt.starkandwayne.com/">https://apt.starkandwayne.com/</a> Debian repository as part of <code>cf push</code>.</p>
+
+<p>Fortunately, Cloud Foundry now has an <a href="https://github.com/cloudfoundry/apt-buildpack/">apt buildpack</a> to make this very easy to combine.</p>
+
+<p>Any Cloud Foundry application can now have any Debian package installed during the <code>cf push</code> staging sequence. The installed packages (and their nested dependencies) will be baked into the droplet and will be consistent across every instance of the application.</p>
+
+<h3 id="step1theaptymlfile">Step 1. The apt.yml file.</h3>
+
+<p>For my demo app I needed the <code>bosh-cli</code> package from <a href="https://apt.starkandwayne.com">https://apt.starkandwayne.com</a> to be installed during <code>cf push</code>.</p>
+
+<p>All I need to create is an <code>apt.yml</code> file:</p>
+
+<pre><code>---
+keys:  
+- https://raw.githubusercontent.com/starkandwayne/homebrew-cf/master/public.key
+repos:  
+- deb http://apt.starkandwayne.com stable main
+packages:  
+- bosh-cli
+</code></pre>
+
+<p>This <code>apt.yml</code> file corresponds to the <a href="https://apt.starkandwayne.com">https://apt.starkandwayne.com</a> instructions:</p>
+
+<pre><code>wget -q -O - https://raw.githubusercontent.com/starkandwayne/homebrew-cf/master/public.key | apt-key add -  
+echo "deb http://apt.starkandwayne.com stable main" | tee /etc/apt/sources.list.d/starkandwayne.list  
+apt-get update
+
+apt-get install bosh-cli  
+</code></pre>
+
+<p>The primary difference, aside from syntax, is that Cloud Foundry applications do not have root access, so I cannot simply <code>apt-get install</code> packages. The <code>apt-buildpack</code> installs packages into a location</p>
+
+<h3 id="step2usingmultiplebuildpacks">Step 2. Using multiple buildpacks</h3>
+
+<p>The <code>apt</code> buildpack is not the only buildpack we need. My app is a Ruby app. It needs the standard <code>ruby</code> buildpack too.</p>
+
+<p>All modern Cloud Foundry distributions will have two ways to use multiple buildpacks: a <code>cf push</code> method and <code>cf v3-push</code> method.</p>
+
+<p>I've written up both sets of instructions in the <a href="https://github.com/cloudfoundry-community/bosh-cli-web-demo#deploy-to-cloud-foundry">demo application README</a>.</p>
+
+<p>In brief, <code>cf push</code> only allows a single buildpack - so you use <a href="https://github.com/cloudfoundry/multi-buildpack/">https://github.com/cloudfoundry/multi-buildpack/</a>. You then create a <code>multi-buildpack.yml</code> file to specify the ordered set of buildpacks.</p>
+
+<pre><code>buildpacks:  
+- https://github.com/cloudfoundry/apt-buildpack
+- https://github.com/cloudfoundry/ruby-buildpack
+</code></pre>
+
+<p>NOTE: The last buildpack must be the runtime buildpack.</p>
+
+<p>Alternately, <code>cf v3-push</code> natively supports multiple buildpacks. You provide the ordered list as flags:</p>
+
+<pre><code>cf v3-push bosh-cli-web-demo \  
+  -b https://github.com/cloudfoundry/apt-buildpack \
+  -b ruby_buildpack
+</code></pre>
+
+<p>Again, the final buildpack must be buildpack that will initialize and run the web application.</p>
+
+<h2 id="learnmore">Learn more</h2>
+
+<p>Watch Keaty Gross at Cloud Foundry Summit Basel 2017 to learn more about multi-buildpack, apt-buildpack, and the future of Cloud Foundry!</p>
+
+<iframe width="560" height="315" src="https://www.youtube.com/embed/41wEXS03U78" frameborder="0" allowfullscreen></iframe>]]></content:encoded></item><item><title><![CDATA[Running your Own DNS Server in Cloud Foundry]]></title><description><![CDATA[<h1 id="overview">Overview</h1>
+
+<p>I ran across a nifty trick today to deploy a local DNS for Cloud Foundry.  We all deserve nice things so I figured I would share.</p>
+
+<p>We have a Cloud Foundry environment which is being migrated across infrastructures and need to test different scenarios keeping system and run urls</p>]]></description><link>http://www.starkandwayne.com/blog/running-your-own-dns-server-in-cloud-foundry/</link><guid isPermaLink="false">b7830a93-ec89-48d5-8318-23c46fbf5276</guid><category><![CDATA[author-cweibel]]></category><category><![CDATA[cloudfoundry]]></category><category><![CDATA[dns]]></category><dc:creator><![CDATA[Chris Weibel]]></dc:creator><pubDate>Wed, 25 Oct 2017 00:54:58 GMT</pubDate><content:encoded><![CDATA[<h1 id="overview">Overview</h1>
+
+<p>I ran across a nifty trick today to deploy a local DNS for Cloud Foundry.  We all deserve nice things so I figured I would share.</p>
+
+<p>We have a Cloud Foundry environment which is being migrated across infrastructures and need to test different scenarios keeping system and run urls the same as the old environment. We are not ready to expose the new environment yet.  For now we need local DNS to resolve in the new environment.</p>
+
+<h2 id="implementation">Implementation</h2>
+
+<h6 id="warningherebedragons">Warning: Here be Dragons</h6>
+
+<p>This is a quick/dirty solution for temporary use.  For a longer term solution consider using <a href="https://github.com/cloudfoundry/bosh-deployment/blob/master/local-dns.yml">local-dns.yml</a> opsfile for bosh2 deployments. BOSH + apt-get anything makes operators sad in the long run. </p>
+
+<p>We start by adding one more job to the CF deployment manifest:  </p>
+
+<pre><code>jobs:  
+- name: dns
+  instances: 1
+  networks:
+  - name: default
+    static_ips:
+    - 10.120.2.12
+  resource_pool: medium_z1
+  templates: []
+</code></pre>
+
+<p>This will add basically an empty vm which we can use to configure DNS. <code>bosh ssh</code> onto the server and install <code>dnsmasq</code>:  </p>
+
+<pre><code>apt-get update  
+apt-get install dnsmasq -y  
+</code></pre>
+
+<p>Edit the config file at <code>/etc/dnsmasq.conf</code> and add the dns mappsings you would like:</p>
+
+<pre><code># Points to our CF HAProxy
+address=/system.pr.starkandwayne.com/10.130.16.15  
+address=/run.pr.starkandwayne.com/10.130.16.15  
+</code></pre>
+
+<p>To enable this DNS entry restart the <code>dnsmasq</code> service:  </p>
+
+<pre><code>service dnsmasq restart  
+</code></pre>
+
+<p>Now to get all of the vms in the Cloud Foundry deployment to use this DNS value, modify the <code>networks:</code> block and add the ip address of your new DNS server and redeploy:  </p>
+
+<pre><code>networks:  
+- name: default
+  subnets:
+  - cloud_properties:
+    dns:
+    - 10.120.2.12
+</code></pre>
+
+<p>Now you can dig <code>system.pr.starkandwayne.com</code> from any server with the new DNS entry and get the ip address of the HAProxy server in CF:  </p>
+
+<pre><code>; &lt;&lt;&gt;&gt; DiG 9.10.3-P4-Ubuntu &lt;&lt;&gt;&gt; system.pr.starkandwayne.com
+;; global options: +cmd
+;; Got answer:
+;; -&gt;&gt;HEADER&lt;&lt;- opcode: QUERY, status: NOERROR, id: 2181
+;; flags: qr aa rd ra; QUERY: 1, ANSWER: 1, AUTHORITY: 0, ADDITIONAL: 0
+
+;; QUESTION SECTION:
+;system.pr.starkandwayne.com. IN    A
+
+;; ANSWER SECTION:
+system.pr.starkandwayne.com. 0 IN    A   10.130.16.15
+
+;; Query time: 0 msec
+;; SERVER: 10.120.2.12#53(10.130.16.15)
+;; WHEN: Wed Oct 25 00:37:16 UTC 2017
+;; MSG SIZE  rcvd: 65
+</code></pre>
+
+<p>If you run <code>dig</code> from a server which does not have this dns server entry you'll get the old environment (ie: the customer only sees the old environment):  </p>
+
+<pre><code>; &lt;&lt;&gt;&gt; DiG 9.10.3-P4-Ubuntu &lt;&lt;&gt;&gt; system.pr.starkandwayne.com
+;; global options: +cmd
+;; Got answer:
+;; -&gt;&gt;HEADER&lt;&lt;- opcode: QUERY, status: NOERROR, id: 14649
+;; flags: qr rd ra; QUERY: 1, ANSWER: 3, AUTHORITY: 0, ADDITIONAL: 1
+
+;; OPT PSEUDOSECTION:
+; EDNS: version: 0, flags:; udp: 4096
+;; QUESTION SECTION:
+;system.pr.starkandwayne.com. IN A
+
+;; ANSWER SECTION:
+system.pr.starkandwayne.com. 60 IN CNAME CF-System-7168675309.us-east-1.elb.amazonaws.com.  
+CF-System-7168675309.us-east-1.elb.amazonaws.com. 60 IN A 52.165.68.112  
+CF-System-7168675309.us-east-1.elb.amazonaws.com. 60 IN A 52.162.32.221
+
+;; Query time: 28 msec
+;; SERVER: 10.13.6.28#53(10.30.22.82)
+;; WHEN: Wed Oct 25 00:42:38 UTC 2017
+;; MSG SIZE  rcvd: 171
+</code></pre>
+
+<p>Once we are ready to expose this new environment to the world we simply remove the dns entry <code>10.120.2.12</code> from the <code>default</code> network, redeploy and register public DNS to our CF HAProxy node.</p>
+
+<h2 id="conclusions">Conclusions</h2>
+
+<p>I'm sure there are a dozen ways this could have been done, this one just happend to work for our use case.  Alternate suggestions are welcome in the comments!</p>]]></content:encoded></item><item><title><![CDATA[ELB & Instance Information From AWS CLI with IAM Profile]]></title><description><![CDATA[<h1 id="overview">Overview</h1>
+
+<p>Every once in a while you will find an organization which will not give you AWS Console access so you have to become handy using the AWS CLI for managing the infrastructure underneath BOSH.  Fear not, the CLI can be used to retrieve even more information than the Console.</p>]]></description><link>http://www.starkandwayne.com/blog/elb-instance-information-from-aws-cli-with-iam-profile/</link><guid isPermaLink="false">b2121d93-da44-4dec-abdf-aff259228f70</guid><category><![CDATA[author-cweibel]]></category><category><![CDATA[BOSH]]></category><category><![CDATA[AWS]]></category><category><![CDATA[IAM Profiles]]></category><dc:creator><![CDATA[Chris Weibel]]></dc:creator><pubDate>Tue, 24 Oct 2017 18:17:57 GMT</pubDate><content:encoded><![CDATA[<h1 id="overview">Overview</h1>
+
+<p>Every once in a while you will find an organization which will not give you AWS Console access so you have to become handy using the AWS CLI for managing the infrastructure underneath BOSH.  Fear not, the CLI can be used to retrieve even more information than the Console.</p>
+
+<p>You will need to retrieve a set of credentials which come in two flavors:</p>
+
+<ul>
+<li>AWS Access and Secret keys</li>
+<li>IAM Profiles</li>
+</ul>
+
+<h2 id="retrievingawsaccessandsecret">Retrieving AWS Access and Secret</h2>
+
+<p>If you leverage AWS Access and Secret keys they are defined in your deployment manifest for BOSH:</p>
+
+<pre><code>cloud_provider:  
+  properties:
+    aws:
+      access_key_id: AKIATONYANDBRUCE
+      region: us-east-1
+      secret_access_key: c9someReallyLongPassword4meR
+</code></pre>
+
+<p>Now you can use this information to configure the AWS CLI which can be installed with <a href="http://docs.aws.amazon.com/cli/latest/userguide/installing.html">these instructions</a>:</p>
+
+<pre><code>aws config  
+AWS Access Key ID []: enter cloud_provider.properties.aws.access_key_id here  
+AWS Secret Access Key []: enter cloud_provider.properties.aws.secret_access_key here  
+Default region name []: enter cloud_provider.properties.aws.region here  
+Default output format [json]: just hit enter  
+</code></pre>
+
+<p>Now you can discover ELB (which you would have in front of your CF Routers) information by:  </p>
+
+<pre><code>aws elb describe-load-balancers  
+</code></pre>
+
+<p>If you also want information about your EC2 instances:  </p>
+
+<pre><code>aws ec2 describe-instances  
+</code></pre>
+
+<h2 id="retrievingawsiamprofile">Retrieving AWS IAM Profile</h2>
+
+<p>If you are using IAM profiles your deployment manifest for BOSH will be configured similar to:  </p>
+
+<pre><code>cloud_provider:  
+  properties:
+    aws:
+      credentials_source: env_or_profile
+      iam_instance_profile: bosh-profile
+      region: us-east-1
+</code></pre>
+
+<p>No <code>access_key_id</code> or <code>secret_access_key</code> here.  The AWS CLI can be configured to use a <a href="http://docs.aws.amazon.com/cli/latest/userguide/cli-roles.html">Role</a> but reguires a few additional bits of information:</p>
+
+<ul>
+<li>a profile name</li>
+<li>role_arn</li>
+</ul>
+
+<p>To get the <code>role_arn</code> ssh onto the jumpbox or BOSH Director with the IAM Profile and run:  </p>
+
+<pre><code>curl http://169.254.169.254/latest/meta-data/iam/info  
+</code></pre>
+
+<p>This will output something similar to the following, with <code>InstanceProfileArn</code> containing the value we need:  </p>
+
+<pre><code>{
+  "Code" : "Success",
+  "LastUpdated" : "2017-10-24T17:16:15Z",
+  "InstanceProfileArn" : "arn:aws:iam::12345678912:instance-profile/bosh-profile",
+  "InstanceProfileId" : "AIPANOTBRUCEORTONEY"
+}
+</code></pre>
+
+<p>For this example we'll call our profile <code>prodaccess</code>.  Using the <code>arn_role</code> and profile name info you can craft an AWS config file in <code>~/.aws/config</code> similar to:  </p>
+
+<pre><code>[default]
+output = json  
+[profile prodaccess]
+profile_arn = arn:aws:iam::12345678912:instance-profile/bosh-profile  
+source_profile = default  
+region = us-east-1  
+</code></pre>
+
+<p>Now the aws elb command can be executed with the addition of a <code>--profile</code> parameter:</p>
+
+<pre><code>aws elb describe-load-balancers --profile prodaccess  
+</code></pre>
+
+<p>Similarly you can retrieve ec2 instance information:  </p>
+
+<pre><code>aws ec2 describe-instances --profile prodaccess  
+</code></pre>
+
+<h2 id="finalthoughts">Final Thoughts</h2>
+
+<p>We all deserve to have nice things. Access to the AWS CLI is a great tool when managing BOSH deployed resources whether contolled by IAM Profiles or traditional AWS Access and Secret Keys.</p>
+
+<p>This tool can also be used to force a reboot of a VM which BOSH has lost control of and <code>bosh cck</code> isn't fixing.  Happy to answer questions in the comments below!</p>]]></content:encoded></item><item><title><![CDATA[Add Computer Vision to your Cloud Foundry app using OpenCV]]></title><description><![CDATA[OpenCV is a fast computer vision library. We're excited to bring OpenCV to every Cloud Foundry application through a new buildpack.]]></description><link>http://www.starkandwayne.com/blog/add-computer-vision-to-your-cloud-foundry-app-using-opencv/</link><guid isPermaLink="false">33506fd2-43d6-47ac-8c7c-f77e0afae9b4</guid><category><![CDATA[cloudfoudry]]></category><category><![CDATA[buildpack]]></category><category><![CDATA[opencv]]></category><category><![CDATA[author-drnic]]></category><dc:creator><![CDATA[Dr Nic Williams]]></dc:creator><pubDate>Mon, 23 Oct 2017 20:18:19 GMT</pubDate><content:encoded><![CDATA[<p><a href="https://opencv.org/">OpenCV</a> is a fast <a href="https://docs.opencv.org/3.3.0/d1/dfb/intro.html">computer vision</a> and <a href="https://github.com/opencv/opencv/wiki/Deep-Learning-in-OpenCV">deep learning</a> library. We're excited to make OpenCV available to every Cloud Foundry application through a new buildpack: <a href="https://github.com/cloudfoundry-community/opencv-buildpack">https://github.com/cloudfoundry-community/opencv-buildpack</a></p>
+
+<p>What can OpenCV do? Firstly, it can determine that the author is human.</p>
+
+<p><img src="https://s3.amazonaws.com/dingo-s3-544e680a-902c-44c1-ab35-94b372e1b39e/2017/10/drnic-is-human.png" alt="drnic-is-human"></p>
+
+<p>And it does <a href="https://docs.opencv.org/3.3.0/d1/dfb/intro.html">other things</a> too. I first used it on a tiny RaspberryPi with a camera. Each frame is piped into OpenCV for processing. YouTube is filled with interesting examples.</p>
+
+<p>Bringing OpenCV to Cloud Foundry will open up a huge range of possibilities. Of course, you cannot connect a camera directly to your Cloud Foundry-hosted web app; so you'll be pushing images into your app via HTTP upload, a popping them off a queue, or the application could be pulling them from another source.</p>
+
+<p>The follow language libraries support OpenCV 3+ of which I'm aware:</p>
+
+<ul>
+<li>Python <a href="https://pypi.python.org/pypi/opencv-python">https://pypi.python.org/pypi/opencv-python</a></li>
+<li>Golang <a href="https://gocv.io">https://gocv.io</a></li>
+<li>Java <a href="http://opencv-java-tutorials.readthedocs.io/en/latest/">http://opencv-java-tutorials.readthedocs.io/en/latest/</a></li>
+</ul>
+
+<p>The buildpack repository includes a sample Python app <a href="https://github.com/cloudfoundry-community/opencv-buildpack/tree/master/fixtures/py-sample">https://github.com/cloudfoundry-community/opencv-buildpack/tree/master/fixtures/py-sample</a> which is used as the example in the README.</p>
+
+<p>To add OpenCV to any application, use the new <code>cf v3-push</code> command and pass the repo URL as the first buildpack. The last buildpack in the list must be primary buildpack that will run your application:</p>
+
+<pre><code>git clone https://github.com/cloudfoundry-community/opencv-buildpack  
+cd opencv-buildpack  
+cf v3-push py-sample-app-with-opencv -p fixtures/py-sample \  
+  -b https://github.com/cloudfoundry-community/opencv-buildpack \
+  -b python_buildpack
+</code></pre>
+
+<p>If your language has bindings for OpenCV 2 only, let me know in the <a href="https://github.com/cloudfoundry-community/opencv-buildpack/issues">issues</a> and I'll look to add OpenCV 2.</p>
+
+<p>The recent CF Summit EU 2017 in Basel Switzerland had a range of talks on multi-buildpacks, which was the genesis of my excitement which lead to this OpenCV buildpack. Please watch <a href="https://www.youtube.com/watch?v=0DnQNTq8FLw&amp;list=PLhuMOCWn4P9hsn9q-GRTa77gxavTOnHaa&amp;index=59">Keaty Gross at her keynote</a>, or her <a href="https://www.youtube.com/watch?v=41wEXS03U78">talk</a>, or from <a href="https://www.youtube.com/watch?v=LLl4R9SqkNQ&amp;list=PLhuMOCWn4P9hsn9q-GRTa77gxavTOnHaa&amp;index=102">Topher Bullock's talk</a>.</p>]]></content:encoded></item><item><title><![CDATA[SHIELD: Looking Forward]]></title><description><![CDATA[<p>Here at Stark &amp; Wayne, we've been heads-down for the past several months, working on the next iteration of <a href="https://github.com/starkandwayne/shield/tree/v8">SHIELD</a>, our data protection solution. We've got a lot of great stuff in store, and I wanted to take a moment to highlight some of the major features we will be</p>]]></description><link>http://www.starkandwayne.com/blog/shield-a-look-forward/</link><guid isPermaLink="false">792eeebf-346a-4e4d-a77c-5b44d720034f</guid><dc:creator><![CDATA[James Hunt]]></dc:creator><pubDate>Wed, 18 Oct 2017 17:25:26 GMT</pubDate><content:encoded><![CDATA[<p>Here at Stark &amp; Wayne, we've been heads-down for the past several months, working on the next iteration of <a href="https://github.com/starkandwayne/shield/tree/v8">SHIELD</a>, our data protection solution. We've got a lot of great stuff in store, and I wanted to take a moment to highlight some of the major features we will be launching with SHIELD v8.</p>
+
+<p>(If you're feeling particularly nostalgic, you may want to read the previous post in this series, <a href="http://www.starkandwayne.com/blog/shield-a-look-back/">SHIELD: A Look Back</a>)</p>
+
+<h2 id="atrestencryption">At-Rest Encryption  </h2>
+
+<p>The SHIELD team has always taken data security seriously, and the system architecture leverages encryption for all data as it transits the network, but up until now, operators had to rely on the cloud storage layer itself to provide at-rest encryption.</p>
+
+<p>No more.</p>
+
+<p>Starting in SHIELD v8, backup archives will be encrypted immediately before they are stored in the cloud, using AES-256. Each archive gets a unique key and initialization vector, to protect against statistical fingerprinting attacks against similar or identical backup archives, and the secrets are stored in a dedicated vault of secrets, used and accessible only by the SHIELD Core.</p>
+
+<p>Your sensitive data is now protected; even if someone has read access to (for example) your Amazon S3 bucket, they won't be able to decipher the backup archives to get at the sensitive information.</p>
+
+<h2 id="rolesandaccesscontrol">Roles and Access Control  </h2>
+
+<p>Prior versions of SHIELD featured authentication, but lacked fine-grained authorization. If you could login into SHIELD, you had full run of the system.</p>
+
+<p>SHIELD v8 introduces six different roles that limit and restrict access to the various parts of SHIELD and its data set / configuration:</p>
+
+<ul>
+<li><strong>Site Administrator</strong> - Full control.  <code>root</code>-level access.</li>
+<li><strong>Site Manager</strong> - Manages tenants (more on that in a bit) and who is assigned to each tenant.</li>
+<li><strong>Site Engineer</strong> - Manages shared resources like global cloud storage definitions and retention policy templates.</li>
+<li><strong>Tenant Administrator</strong> - Full control of a single tenant (we'll get to tenants shortly).</li>
+<li><strong>Tenant Engineer</strong> - Manages target, storage, retention policy, and job configuration for a tenant.</li>
+<li><strong>Tenant Operator</strong> - Minimal access to perform restore operations, and run, pause, and unpause jobs.</li>
+</ul>
+
+<p>Leveraging roles, SHIELD site operators will be able to open up their SHIELD installations to a wider operations / infrastructure team, safe in the knowledge that critical configuration and sensitive tasks will be limited to a trusted few.</p>
+
+<h2 id="multitenancy">Multi-Tenancy  </h2>
+
+<p>The largest operational change in SHIELD v8, multi-tenancy allows a single SHIELD installation to be safely shared by two or more distinct teams, without anyone stepping on anyone else's toes.</p>
+
+<p>Inside of SHIELD, each tenant has its own set of retention policies, cloud storage configurations, data systems, and jobs. People can be granted one of three roles on a tenant (admin, engineer, or operator), affording them different levels of control over these resources.</p>
+
+<p>If you want, you can put people in multiple tenants, and they can switch between the tenants they belong to.</p>
+
+<p>(For those of you familiar with Github, we stole the idea of <em>Organizations</em> from them and adapted it to the needs of SHIELD.)</p>
+
+<p>Not all things need to be shared, however, and SHIELD v8 allows SHIELD site engineers to define global storage systems and retention policy templates. Any tenant can use a global storage system in their job configuration, but won't be able to see the configuration (so your Amazon S3 credentials are safe and sound). Retention Policy Templates are copied into each tenant when they are created, so everyone gets a good "starting point."</p>
+
+<h2 id="anoperatorfocusedwebui">An Operator-Focused Web UI  </h2>
+
+<p>The SHIELD Web User Interface gets a complete redesign in SHIELD v8, bringing with it a new, more operator-centric approach to common data protection tasks. The new UI features some handy workflows for common tasks like performing ad hoc backups, restoring from the last good archive, and configuring new jobs.</p>
+
+<p>They say a picture is worth a thousand words, so here's a before-and-after screenshot throwdown, with the new v8 UI on the right:</p>
+
+<p><img src="https://s3.amazonaws.com/dingo-s3-544e680a-902c-44c1-ab35-94b372e1b39e/2017/10/head2head.png" alt="SHIELD v2 UI Head-to-Head"></p>
+
+<h2 id="thirdpartyauthenticationproviders">Third Party Authentication Providers  </h2>
+
+<p>Of definite interest to enterprise Cloud Foundry / BOSH shops, SHIELD v8 will support pluggable <em>authentication providers</em> for authenticating against third part systems like Github (both github.com and Github Enterprise) and Cloud Foundry UAA.  These providers are fully supported in both the web interface and the <code>shield</code> command-line utility.</p>
+
+<p>SHIELD site administrators can configure these providers to automatically map logical groups inside of Github / UAA into SHIELD tenant / role assignments.  For example, you can assign everyone in your company Github organization the Tenant Operator role in your company SHIELD Tenant.  If you are using UAA to support BOSH teams, you can map those BOSH teams into SHIELD tenants and enforce the same separation for backups as you do for deployments.</p>
+
+<p>SHIELD v8 also supports locally-managed accounts, if you still want the power and flexibility of tenants, but don't have a suitable 3rd party system to authenticate against.</p>
+
+<p>Oh, and token authentication is still a thing too, since automation is key to a healthy infrastructure.</p>
+
+<h2 id="agentmetadata">Agent Metadata  </h2>
+
+<p>SHIELD has always been a loosely connected network of agents working together to perform backup and recovery operations, but with SHIELD v8, that network becomes a little more tight-knit and more self-aware.</p>
+
+<p>SHIELD v8 agents register with their SHIELD Core, providing it important metadata information like:</p>
+
+<ul>
+<li>What version of the SHIELD software is the agent running?</li>
+<li>What plugins are installed on the agent?</li>
+<li>What configuration parameters do those plugins accept?</li>
+</ul>
+
+<p>This information allows the new web UI to provide a more operator-friendly method of configuring target systems and cloud storage, by way of forms and widgets instead of manually entered JSON (we're really sorry about that UX faux pas).</p>
+
+<p>SHIELD site operators can use the health and version information reported by registered agents to track down problems before they become outages, and to find misconfigurations, lagging versions, and other incompatibilities.</p>
+
+<h2 id="cloudstoragehealthandusage">Cloud Storage Health and Usage  </h2>
+
+<p>Prior to SHIELD v8, site operators were generally unaware that a cloud storage provider was unhealthy, or out of space, until a scheduled job failed, usually early in the morning.</p>
+
+<p>We're fixing that in SHIELD v8.</p>
+
+<p>Now, the SHIELD Core will regularly run liveness checks against each configured cloud storage solution to verify that the remote system is reachable, that credentials haven't been revoked, etc. This way, operators will be made aware of potential problems <em>before</em> the 3 a.m. backups start kicking off and failing.</p>
+
+<h2 id="strongerdisasterrecovery">Stronger Disaster Recovery  </h2>
+
+<p>SHIELD v8 sports an internal database engine for its configuration and metadata, which enables a holistic method of backing up SHIELD itself, and properly restoring it to a working state in the event of a datacenter-level outage.</p>
+
+<h2 id="docsdocsandmoredocs">Docs, Docs, and More Docs  </h2>
+
+<p>Last but not least, SHIELD v8 will be launching with a full-complement of reference documentation and task-based guides on everything from tenant management to authentication configuration. All of this lovely documentation will be collected in one place, a new project-specific website for SHIELD itself.</p>
+
+<h2 id="staytuned">Stay Tuned  </h2>
+
+<p>We've got a lot of exciting stuff coming with the SHIELD v8 launch, so stay tuned for future blog posts, and maybe even some demo videos, as we take deeper dives into the new functionality that makes SHIELD v8 such a compelling solution.</p>]]></content:encoded></item></channel></rss>
