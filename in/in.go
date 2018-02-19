@@ -1,4 +1,4 @@
-package main
+package in
 
 import (
 	"encoding/json"
@@ -7,6 +7,7 @@ import (
 	"html/template"
 	"io/ioutil"
 	"net/http"
+	"os"
 )
 
 type RSSEnclosure struct {
@@ -31,7 +32,7 @@ type Item struct {
 	Category    []string      `xml:"category"`
 }
 
-func main() {
+func Execute() {
 	r := RSSEnclosure{}
 	r = r
 	httpData, _ := http.Get("https://www.starkandwayne.com/blog/rss/")
@@ -69,6 +70,6 @@ func main() {
 	for _, post := range returnposts {
 		fmt.Println(post.Title)
 	}
-	fmt.Println(postjson)
-
+	//fmt.Println(postjson)
+	os.Stdout.Write(postjson)
 }
