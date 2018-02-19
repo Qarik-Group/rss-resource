@@ -1,4 +1,4 @@
-package in
+package main
 
 import (
 	"encoding/json"
@@ -32,7 +32,7 @@ type Item struct {
 	Category    []string      `xml:"category"`
 }
 
-func Execute() {
+func main() {
 	r := RSSEnclosure{}
 	r = r
 	httpData, _ := http.Get("https://www.starkandwayne.com/blog/rss/")
