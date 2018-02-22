@@ -3,11 +3,11 @@ package main
 import (
 	"encoding/json"
 	"encoding/xml"
-	"fmt"
 	"html/template"
 	"io/ioutil"
 	"net/http"
 	"os"
+	"strings"
 )
 
 type RSSEnclosure struct {
@@ -33,43 +33,27 @@ type Item struct {
 }
 
 func main() {
+	if len(os.Args) < 2 {
+		panic("please supply more arguments")
+	}
 	r := RSSEnclosure{}
 	r = r
 	httpData, _ := http.Get("https://www.starkandwayne.com/blog/rss/")
 	var returnposts []Item
-	// if httpError != nil {
-	// 	panic(httpError.Error())
-	// }
+	desireddirectory := "./" + os.Args[1] + "/"
 	defer httpData.Body.Close()
 	xmlContent, _ := ioutil.ReadAll(httpData.Body)
-	// if readError != nil {
-	// 	panic(readError.Error())
-	// }
 	xml.Unmarshal(xmlContent, &r)
-	//fmt.Println(r)
-	// xmlError := xml.Unmarshal(xmlContent, &r)
-	// if xmlError != nil {
-	// 	panic(xmlError.Error())
-	// }
-	// fmt.Println(r.LastBuildDate)
-	// fmt.Println(os.Getenv("LAST_BUILD_DATE"))
-	// if r.LastBuildDate != os.Getenv("LAST_BUILD_DATE") {
-	// 	os.Setenv("LAST_BUILD_DATE", r.LastBuildDate)
-	// 	fmt.Println("RSS feed has changed. Willtrigger.")
-	// }
+	returnposts = r.ItemList
+	postjson, _ := json.Marshal(returnposts)
 	for _, item := range r.ItemList {
-		//Loop RSS feeds for <item>, which is a post
-		curItem := item
-		for _, categ := range curItem.Category {
-			if categ == "SHIELD" {
-				returnposts = append(returnposts, item)
-			}
+		post, _ := json.Marshal(item)
+		err := ioutil.WriteFile(desireddirectory+strings.Replace(item.Title, " ", "", -1), post, 0644)
+		if err != nil {
+			panic(err.Error())
 		}
 	}
-	postjson, _ := json.Marshal(returnposts)
-	for _, post := range returnposts {
-		fmt.Println(post.Title)
-	}
+	postjson = postjson
 	//fmt.Println(postjson)
-	os.Stdout.Write(postjson)
+	//os.Stdout.Write(postjson)
 }
