@@ -82,9 +82,8 @@ func In() {
 	out.Version.Ref = "(none)"
 	if len(r.Items) > 0 {
 		out.Version.Ref = r.Items[0].PubDate
-		out.Metadata = append(out.Metadata, Metadata{Name: "Title:", Value: r.Items[0].Title})
-		out.Metadata = append(out.Metadata, Metadata{Name: "Author:", Value: r.Items[0].Author})
-		out.Metadata = append(out.Metadata, Metadata{Name: "Link:", Value: r.Items[0].Link})
+		out.Metadata = append(out.Metadata, Metadata{Name: "title", Value: r.Items[0].Title})
+		out.Metadata = append(out.Metadata, Metadata{Name: "link", Value: r.Items[0].Link})
 	}
 
 	b, err = json.Marshal(out)
