@@ -4,3 +4,5 @@ assets/in:
 assets/check: check
 	cp $+ $@
 	chmod 755 $@
+
+.PHONY: assets/in

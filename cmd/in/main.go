@@ -8,6 +8,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
+	"regexp"
 	"strings"
 )
 
@@ -55,6 +56,19 @@ type Config struct {
 	} `json:"source"`
 }
 
+func title2file(s string) string {
+	return regexp.MustCompile(`^-|-$`).ReplaceAllString(
+		regexp.MustCompile(`--+`).ReplaceAllString(
+			regexp.MustCompile(`[^a-z0-9]`).ReplaceAllString(
+				strings.ToLower(s),
+				"-",
+			),
+			"",
+		),
+		"",
+	)
+}
+
 func main() {
 	var (
 		r   RSS
@@ -97,6 +111,11 @@ func main() {
 		fmt.Printf("Failed to read response from %s: %s\n", cfg.Source.URL, err)
 		os.Exit(1)
 	}
+	err = ioutil.WriteFile("feed.xml", rss, 0666)
+	if err != nil {
+		fmt.Printf("Failed to save feed.xml to local directory: %s\n", err)
+		os.Exit(1)
+	}
 
 	err = xml.Unmarshal(rss, &r)
 	if err != nil {
@@ -111,7 +130,7 @@ func main() {
 			fmt.Printf("Failed to marshal post #%d (%s) to JSON: %s\n", i+1, item.Title, err)
 			os.Exit(1)
 		}
-		file := fmt.Sprintf("posts/%s.json", strings.Replace(item.Title, " ", "", -1))
+		file := fmt.Sprintf("posts/%s.json", title2file(item.Title))
 		err = ioutil.WriteFile(file, b, 0666)
 		if err != nil {
 			fmt.Printf("Failed to write post #%d (%s) JSON to %s: %s\n", i+1, item.Title, file, err)
