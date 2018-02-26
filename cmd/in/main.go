@@ -56,11 +56,13 @@ type Config struct {
 	} `json:"source"`
 }
 
-func title2file(s string) string {
+func filename(date, title string) string {
 	return regexp.MustCompile(`^-|-$`).ReplaceAllString(
 		regexp.MustCompile(`--+`).ReplaceAllString(
 			regexp.MustCompile(`[^a-z0-9]`).ReplaceAllString(
-				strings.ToLower(s),
+				strings.ToLower(
+					fmt.Sprintf("%s-%s", date, title),
+				),
 				"-",
 			),
 			"",
@@ -130,7 +132,7 @@ func main() {
 			fmt.Printf("Failed to marshal post #%d (%s) to JSON: %s\n", i+1, item.Title, err)
 			os.Exit(1)
 		}
-		file := fmt.Sprintf("posts/%s.json", title2file(item.Title))
+		file := fmt.Sprintf("posts/%s.json", filename(item.PubDate, item.Title))
 		err = ioutil.WriteFile(file, b, 0666)
 		if err != nil {
 			fmt.Printf("Failed to write post #%d (%s) JSON to %s: %s\n", i+1, item.Title, file, err)
