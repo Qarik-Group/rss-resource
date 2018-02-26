@@ -1,20 +1,20 @@
 resource_types:
-  - name: rss-resource
+  - name: rss
     type: docker-image
     source:
-      repository: starkandwayne/concourse-rss-resource
-      tag: develop
+      repository: starkandwayne/rss-resource
+      tag: latest
 
 resources:
-  - name: test-rss-resource
-    type: rss-resource
+  - name: feed
+    type: rss
     source:
       url: https://starkandwayne.com/blog/rss/
 
 jobs:
   - name: test-rss-resource
     plan:
-    - get: test-rss-resource
+    - get: feed
       trigger: true
 
     - task: alert
