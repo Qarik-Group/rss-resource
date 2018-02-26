@@ -8,4 +8,5 @@ assets/check: check
 docker:
 	docker build -t starkandwayne/rss-resource .
 
-.PHONY: assets/in docker
+all: default docker
+.PHONY: assets/in docker all
