@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"encoding/xml"
+	"fmt"
 	"html/template"
 	"io/ioutil"
 	"net/http"
@@ -32,6 +33,20 @@ type Item struct {
 	Category    []string      `xml:"category"`
 }
 
+type ReturnJson struct {
+	Version  Version `json:"version"`
+	Metadata []Meta  `json:"metadata"`
+}
+
+type Version struct {
+	Ref string `json:"ref"`
+}
+
+type Meta struct {
+	Name  string `json:"name"`
+	Value string `json:"value"`
+}
+
 func main() {
 	if len(os.Args) < 2 {
 		panic("please supply more arguments")
@@ -39,21 +54,22 @@ func main() {
 	r := RSSEnclosure{}
 	r = r
 	httpData, _ := http.Get("https://www.starkandwayne.com/blog/rss/")
-	var returnposts []Item
-	desireddirectory := "./" + os.Args[1] + "/"
+	desireddirectory := os.Args[1]
+	os.MkdirAll(desireddirectory, 0777) //0644? note should probably change permissions
 	defer httpData.Body.Close()
 	xmlContent, _ := ioutil.ReadAll(httpData.Body)
 	xml.Unmarshal(xmlContent, &r)
-	returnposts = r.ItemList
-	postjson, _ := json.Marshal(returnposts)
 	for _, item := range r.ItemList {
 		post, _ := json.Marshal(item)
-		err := ioutil.WriteFile(desireddirectory+strings.Replace(item.Title, " ", "", -1), post, 0644)
+		err := ioutil.WriteFile(desireddirectory+"/"+strings.Replace(item.Title, " ", "", -1)+".json", post, 0777)
 		if err != nil {
 			panic(err.Error())
 		}
 	}
-	postjson = postjson
-	//fmt.Println(postjson)
-	//os.Stdout.Write(postjson)
+	rawVersion := Version{Ref: "latest"}
+	rawMeta := Meta{Name: "Latest Title", Value: r.ItemList[0].Title}
+	metalist := []Meta{rawMeta}
+	rawReturn := ReturnJson{Version: rawVersion, Metadata: metalist}
+	json, _ := json.Marshal(rawReturn)
+	fmt.Printf("%s\n", json)
 }
