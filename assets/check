@@ -1,9 +1,0 @@
-#!/bin/sh
-
-curl -I -s https://www.starkandwayne.com/blog/rss/ > /dev/null
-if [[ $? != 0 ]]
-  then
-    exit 1
-fi
-
-echo "[ { \"ref\": \"`curl -s https://www.starkandwayne.com/blog/rss/ | sha1sum | awk '{ print $1 }'`\" } ]"
