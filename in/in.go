@@ -8,6 +8,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
+	"strings"
 )
 
 type RSSEnclosure struct {
@@ -32,44 +33,43 @@ type Item struct {
 	Category    []string      `xml:"category"`
 }
 
+type ReturnJson struct {
+	Version  Version `json:"version"`
+	Metadata []Meta  `json:"metadata"`
+}
+
+type Version struct {
+	Ref string `json:"ref"`
+}
+
+type Meta struct {
+	Name  string `json:"name"`
+	Value string `json:"value"`
+}
+
 func main() {
+	if len(os.Args) < 2 {
+		panic("please supply more arguments")
+	}
 	r := RSSEnclosure{}
 	r = r
 	httpData, _ := http.Get("https://www.starkandwayne.com/blog/rss/")
-	var returnposts []Item
-	// if httpError != nil {
-	// 	panic(httpError.Error())
-	// }
+	desireddirectory := os.Args[1]
+	os.MkdirAll(desireddirectory, 0777) //0644? note should probably change permissions
 	defer httpData.Body.Close()
 	xmlContent, _ := ioutil.ReadAll(httpData.Body)
-	// if readError != nil {
-	// 	panic(readError.Error())
-	// }
 	xml.Unmarshal(xmlContent, &r)
-	//fmt.Println(r)
-	// xmlError := xml.Unmarshal(xmlContent, &r)
-	// if xmlError != nil {
-	// 	panic(xmlError.Error())
-	// }
-	// fmt.Println(r.LastBuildDate)
-	// fmt.Println(os.Getenv("LAST_BUILD_DATE"))
-	// if r.LastBuildDate != os.Getenv("LAST_BUILD_DATE") {
-	// 	os.Setenv("LAST_BUILD_DATE", r.LastBuildDate)
-	// 	fmt.Println("RSS feed has changed. Willtrigger.")
-	// }
 	for _, item := range r.ItemList {
-		//Loop RSS feeds for <item>, which is a post
-		curItem := item
-		for _, categ := range curItem.Category {
-			if categ == "SHIELD" {
-				returnposts = append(returnposts, item)
-			}
+		post, _ := json.Marshal(item)
+		err := ioutil.WriteFile(desireddirectory+"/"+strings.Replace(item.Title, " ", "", -1)+".json", post, 0777)
+		if err != nil {
+			panic(err.Error())
 		}
 	}
-	postjson, _ := json.Marshal(returnposts)
-	for _, post := range returnposts {
-		fmt.Println(post.Title)
-	}
-	//fmt.Println(postjson)
-	os.Stdout.Write(postjson)
+	rawVersion := Version{Ref: "latest"}
+	rawMeta := Meta{Name: "Latest Title", Value: r.ItemList[0].Title}
+	metalist := []Meta{rawMeta}
+	rawReturn := ReturnJson{Version: rawVersion, Metadata: metalist}
+	json, _ := json.Marshal(rawReturn)
+	fmt.Printf("%s\n", json)
 }
