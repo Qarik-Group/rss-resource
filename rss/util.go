@@ -6,12 +6,12 @@ import (
 	"strings"
 )
 
-func filename(date, title string) string {
+func filename(post Post) string {
 	return regexp.MustCompile(`^-|-$`).ReplaceAllString(
 		regexp.MustCompile(`--+`).ReplaceAllString(
 			regexp.MustCompile(`[^a-z0-9]`).ReplaceAllString(
 				strings.ToLower(
-					fmt.Sprintf("%s-%s", date, title),
+					fmt.Sprintf("%d-%s", post.Timestamp, post.Title),
 				),
 				"-",
 			),
