@@ -5,11 +5,11 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"time"
 )
 
 func In() {
 	var (
-		r   RSS
 		out Output
 		cfg Config
 	)
@@ -65,10 +65,9 @@ func In() {
 	}
 
 	out.Version.Ref = "(none)"
-	if len(r.Items) > 0 {
-		out.Version.Ref = r.Items[0].PubDate
-		out.Metadata = append(out.Metadata, Metadata{Name: "title", Value: r.Items[0].Title})
-		out.Metadata = append(out.Metadata, Metadata{Name: "link", Value: r.Items[0].Link})
+	if len(feed) > 0 {
+		out.Version.Ref = time.Unix(feed[0].Timestamp, 0).Format("2006-01-02 15:04:05")
+		out.Metadata = append(out.Metadata, Metadata{Name: "title", Value: feed[0].Title})
 	}
 
 	b, err = json.Marshal(out)

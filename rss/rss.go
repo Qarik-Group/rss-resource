@@ -46,11 +46,13 @@ type Atom struct {
 }
 
 type Post struct {
-	Title     string `json:"title"`
-	Intro     string `json:"intro"`
-	Full      string `json:"full"`
-	Timestamp int64  `json:"ts"`
-	Author    string `json:"author"`
+	Title       string `json:"Title"`
+	Intro       string `json:"Intro"`
+	Full        string `json:"Content"`
+	Timestamp   int64  `json:"PubDate"`
+	Author      string `json:"Author"`
+	Description string `json:"Description"`
+	Link        string `json:"Link"`
 }
 
 type Feed []Post
@@ -105,11 +107,13 @@ func ParseRSS(b []byte) (Feed, error) {
 			return nil, fmt.Errorf("Failed to parse RSS pubDate '%s': %s", item.PubDate, err)
 		}
 		f = append(f, Post{
-			Title:     item.Title,
-			Intro:     item.Description,
-			Full:      item.Content,
-			Timestamp: ts.Unix(),
-			Author:    "", // FIXME
+			Title:       item.Title,
+			Intro:       item.Description,
+			Full:        item.Content,
+			Timestamp:   ts.Unix(),
+			Author:      item.Author, // FIXME
+			Description: item.Description,
+			Link:        item.Link,
 		})
 	}
 	return f, nil
@@ -118,7 +122,6 @@ func ParseRSS(b []byte) (Feed, error) {
 func ParseAtom(b []byte) (Feed, error) {
 	var a Atom
 	if err := xml.Unmarshal(b, &a); err != nil {
-		panic(err)
 		return nil, err
 	}
 
@@ -126,7 +129,6 @@ func ParseAtom(b []byte) (Feed, error) {
 	for _, item := range a.Entries {
 		ts, err := time.Parse("2006-01-02T15:04:05-07:00", item.Updated)
 		if err != nil {
-		panic(err)
 			return nil, fmt.Errorf("Failed to parse Atom timestamp '%s': %s", item.Updated, err)
 		}
 		f = append(f, Post{

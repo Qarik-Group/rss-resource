@@ -1,18 +1,22 @@
 package rss
 
 import (
-	"fmt"
-	"os"
-	"io/ioutil"
 	"crypto/sha1"
-	"net/http"
-	"encoding/json"
 	"crypto/tls"
+	"encoding/json"
+	"fmt"
+	"io/ioutil"
+	"net/http"
+	"os"
+	"regexp"
+	"strings"
 )
 
 func Check() {
 	var cfg Config
-	out := make([]struct { Ref string `json:"ref"` }, 1)
+	out := make([]struct {
+		Ref string `json:"ref"`
+	}, 1)
 
 	b, err := ioutil.ReadAll(os.Stdin)
 	if err != nil {
@@ -50,7 +54,10 @@ func Check() {
 		os.Exit(1)
 	}
 
-	out[0].Ref = fmt.Sprintf("%x", sha1.Sum(rss))
+	re := regexp.MustCompile("<lastBuildDate>.*</lastBuildDate>")
+	rssString := strings.Replace(string(rss), re.FindString(string(rss)), "", -1)
+
+	out[0].Ref = fmt.Sprintf("%x", sha1.Sum([]byte(rssString)))
 	b, err = json.Marshal(out)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to marshal output JSON: %s\n", err)
