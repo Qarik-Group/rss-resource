@@ -12,7 +12,7 @@ resource_types:
 - name: rss
   type: docker-image
   source:
-    repository: starkandwayne/rss
+    repository: starkandwayne/rss-resource
     tag:        latest
 ```
 
